@@ -1,5 +1,5 @@
-# Rust build output dir
-/target
+# Rust build output dirs
+bootloader/target/
 
 # OVMF files, you're going to have to get these yourself
 ovmf/
