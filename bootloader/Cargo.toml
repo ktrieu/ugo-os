@@ -1,3 +1,10 @@
+# Stop rust-analyzer from complaining about us missing the `test` crate
+[[bin]]
+name= "bootloader"
+path = "src/main.rs"
+test = false
+bench = false
+
 [package]
 name = "ugo-os"
 version = "0.1.0"
