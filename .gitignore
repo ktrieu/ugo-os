@@ -1,1 +1,8 @@
+# Rust build output dir
 /target
+
+# OVMF files, you're going to have to get these yourself
+ovmf/
+
+# This is the directory where we build the image that QEMU will boot
+bootimg/
