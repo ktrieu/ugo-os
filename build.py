@@ -10,7 +10,7 @@ CURRENT_DIR = sys.path[0]
 
 BOOTLOADER_PATH = os.path.join(CURRENT_DIR, "bootloader")
 BOOTLOADER_OUTPUT_PATH = os.path.join(
-    BOOTLOADER_PATH, "target/x86_64-unknown-uefi/debug/ugo-os.efi"
+    BOOTLOADER_PATH, "target/x86_64-unknown-uefi/debug/bootloader.efi"
 )
 
 KERNEL_PATH = os.path.join(CURRENT_DIR, "kernel")
