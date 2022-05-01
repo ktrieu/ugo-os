@@ -10,7 +10,6 @@ use uefi::{
         file::{Directory, File, FileAttribute, FileHandle, FileMode},
         fs::SimpleFileSystem,
     },
-    table::boot::{OpenProtocolAttributes, OpenProtocolParams, ScopedProtocol},
     CStr16,
 };
 
@@ -29,32 +28,22 @@ fn open_kernel_file(dir: &mut Directory) -> Result<FileHandle, uefi::Error> {
     )
 }
 
-fn locate_sfs<'a>(
-    handle: Handle,
-    boot_services: &'a BootServices,
-) -> Result<ScopedProtocol<'a, SimpleFileSystem>, uefi::Error> {
-    boot_services.open_protocol::<SimpleFileSystem>(
-        OpenProtocolParams {
-            handle: handle,
-            agent: handle,
-            controller: None,
-        },
-        OpenProtocolAttributes::Exclusive,
-    )
+fn locate_sfs<'a>(boot_services: &'a BootServices) -> Result<&mut SimpleFileSystem, uefi::Error> {
+    boot_services
+        .locate_protocol::<SimpleFileSystem>()
+        .map(|protocol_ref| unsafe { &mut *protocol_ref.get() })
 }
 
 #[entry]
-fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
+fn uefi_main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     uefi_services::init(&mut system_table).unwrap();
 
-    writeln!(system_table.stdout(), "Hello from ugoOS!!!!").unwrap();
+    writeln!(system_table.stdout(), "Hello from ugoOS!!").unwrap();
 
-    let scoped_sfs = locate_sfs(handle, system_table.boot_services())
-        .expect("Failed to locate filesystem protocol.");
-    let sfs = unsafe { &mut *scoped_sfs.interface.get() };
-    drop(scoped_sfs);
+    let sfs =
+        locate_sfs(system_table.boot_services()).expect("Failed to locate filesystem protocol.");
 
-    let mut root_volume = open_root_volume(sfs).expect("Faled to open root volume.");
+    let mut root_volume = open_root_volume(sfs).expect("Failed to open root volume.");
     let mut kernel_file = open_kernel_file(&mut root_volume).expect("Failed to read kernel file.");
 
     writeln!(system_table.stdout(), "Kernel file loaded.").unwrap();
