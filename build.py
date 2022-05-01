@@ -13,8 +13,12 @@ BOOTLOADER_OUTPUT_PATH = os.path.join(
     BOOTLOADER_PATH, "target/x86_64-unknown-uefi/debug/ugo-os.efi"
 )
 
+KERNEL_PATH = os.path.join(CURRENT_DIR, "kernel")
+KERNEL_OUTPUT_PATH = os.path.join(KERNEL_PATH, "target/kernel/debug/kernel")
+
 BOOT_IMAGE_PATH = os.path.join(CURRENT_DIR, "bootimg")
 BOOT_IMAGE_BOOT_FILE = os.path.join(BOOT_IMAGE_PATH, "EFI/BOOT/BOOTX64.efi")
+BOOT_IMAGE_KERNEL_FILE = os.path.join(BOOT_IMAGE_PATH, "ugo-os.elf")
 
 QEMU_EXECUTABLE = "qemu-system-x86_64.exe"
 UEFI_BIOS_PATH = os.path.join(CURRENT_DIR, "ovmf/OVMF-pure-efi.fd")
@@ -23,12 +27,16 @@ UEFI_BIOS_PATH = os.path.join(CURRENT_DIR, "ovmf/OVMF-pure-efi.fd")
 def build():
     # Build the bootloader
     subprocess.call("cargo build", cwd=BOOTLOADER_PATH, shell=True)
+    # Build the kernel
+    subprocess.call("cargo build", cwd=KERNEL_PATH, shell=True)
 
     # Assemble the boot image
     # Ensure our boot image folder actually exists
     os.makedirs(BOOT_IMAGE_PATH, exist_ok=True)
     # And copy over the bootloader file
     shutil.copy2(BOOTLOADER_OUTPUT_PATH, BOOT_IMAGE_BOOT_FILE)
+    # And copy over the kernel file
+    shutil.copy2(KERNEL_OUTPUT_PATH, BOOT_IMAGE_KERNEL_FILE)
 
 
 def run():
