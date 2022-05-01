@@ -1,5 +1,6 @@
 {
     "rust-analyzer.linkedProjects": [
-        "bootloader/Cargo.toml"
+        "bootloader/Cargo.toml",
+        "kernel/Cargo.toml"
     ]
 }
