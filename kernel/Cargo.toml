@@ -1,3 +1,9 @@
+[[bin]]
+name = "kernel"
+path = "src/main.rs"
+test = false
+bench = false
+
 [package]
 name = "kernel"
 version = "0.1.0"
