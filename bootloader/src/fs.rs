@@ -31,15 +31,15 @@ pub fn open_kernel_file(dir: &mut Directory) -> Result<RegularFile, uefi::Error>
 }
 
 fn get_file_size(boot_services: &BootServices, file: &mut RegularFile) -> Result<u64, uefi::Error> {
-    let mut buf = [0; 16];
+    let mut buf = [0; 0];
     // Fetch with a zero size buffer first to get the actual size we need
     let requested_buffer_size = match file.get_info::<FileInfo>(&mut buf) {
         Err(uefi_err) => match uefi_err.data() {
             Some(buffer_size) => *buffer_size,
             // If there's no error, then I guess zero is the requested buffer size
-            _ => 16,
+            _ => 0,
         },
-        _ => 16,
+        _ => 0,
     };
 
     let buf = boot_services.allocate_pool(MemoryType::LOADER_DATA, requested_buffer_size)?;
