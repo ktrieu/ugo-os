@@ -2,11 +2,14 @@
 #![no_std]
 #![feature(abi_efiapi)]
 
+extern crate alloc;
+
 use core::fmt::Write;
 
-use uefi::prelude::*;
+use uefi::{prelude::*, table::boot::MemoryType};
 
 mod fs;
+mod mem;
 
 #[entry]
 fn uefi_main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
@@ -30,6 +33,25 @@ fn uefi_main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         &file[0..4]
     )
     .unwrap();
+
+    let mem_map = mem::get_memory_map(system_table.boot_services())
+        .expect("Failed to retrieve memory map.")
+        .clone();
+
+    for descriptor in mem_map
+        .iter()
+        .filter(|descriptor| descriptor.ty == MemoryType::CONVENTIONAL)
+    {
+        writeln!(
+            system_table.stdout(),
+            "P: {:#x} V: {:#x} | {} pages ({:?}) ",
+            descriptor.phys_start,
+            descriptor.virt_start,
+            descriptor.page_count,
+            descriptor.ty
+        )
+        .unwrap();
+    }
 
     loop {}
 }
