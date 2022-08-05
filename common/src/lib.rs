@@ -3,7 +3,7 @@
 use core::{fmt::Debug, ops, slice};
 
 // The start of the x86-64 high canonical addresses. We'll be using this to indicate kernel memory.
-const KMEM_START: u64 = 0xFFFF_8000_0000_0000;
+pub const KMEM_START: u64 = 0xFFFF_8000_0000_0000;
 
 // This is the default. If we have configurable page sizes later, it will be a huge success for this project.
 pub const PAGE_SIZE: u64 = 4096;

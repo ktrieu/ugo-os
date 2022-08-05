@@ -6,13 +6,14 @@ extern crate alloc;
 
 use core::fmt::Write;
 
-use common::RegionType;
+use common::{RegionType, KMEM_START};
 use uefi::prelude::*;
 
 mod fs;
 mod mem;
 
 use mem::mem_map;
+use mem::valloc;
 
 #[entry]
 fn uefi_main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
@@ -34,6 +35,26 @@ fn uefi_main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         "Kernel file loaded. File size: {}. ELF header: {:x?}.",
         file.len(),
         &file[0..4]
+    )
+    .unwrap();
+
+    let mut valloc = valloc::VirtualAllocator::new(KMEM_START);
+
+    // Test the virtual allocator
+    let alloc_start_1 = valloc.allocate(2).unwrap();
+    let alloc_start_2 = valloc.allocate(2).unwrap();
+
+    writeln!(
+        system_table.stdout(),
+        "Allocated 2 virtual pages starting at {:#x}",
+        alloc_start_1
+    )
+    .unwrap();
+
+    writeln!(
+        system_table.stdout(),
+        "Allocated 2 virtual pages starting at {:#x}",
+        alloc_start_2
     )
     .unwrap();
 
