@@ -40,7 +40,12 @@ pub fn get_memory_map(boot_services: &BootServices) -> Result<Vec<MemRegion>, ue
         )
     };
 
+    // Preallocate a vector so its allocation is captured in the memory map
+    let mut regions: Vec<MemRegion> = Vec::with_capacity(map_size);
+
     let (_, descriptors) = boot_services.memory_map(buffer)?;
 
-    Ok(descriptors.map(descriptor_to_region).collect())
+    regions.extend(descriptors.map(descriptor_to_region));
+
+    Ok(regions)
 }
