@@ -11,6 +11,8 @@ use uefi::{prelude::*, table::boot::MemoryType};
 mod fs;
 mod mem;
 
+use mem::mem_map;
+
 #[entry]
 fn uefi_main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     uefi_services::init(&mut system_table).unwrap();
@@ -34,7 +36,7 @@ fn uefi_main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     )
     .unwrap();
 
-    let mem_map = mem::get_memory_map(system_table.boot_services())
+    let mem_map = mem_map::get_memory_map(system_table.boot_services())
         .expect("Failed to retrieve memory map.")
         .clone();
 
