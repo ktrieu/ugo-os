@@ -6,7 +6,24 @@ use uefi::{
     table::boot::{MemoryDescriptor, MemoryMapSize, MemoryType},
 };
 
-pub fn get_memory_map(boot_services: &BootServices) -> Result<Vec<MemoryDescriptor>, uefi::Error> {
+use common::{MemRegion, RegionType, PAGE_SIZE};
+
+fn descriptor_type_to_region_type(ty: MemoryType) -> RegionType {
+    match ty {
+        MemoryType::CONVENTIONAL => RegionType::Usable,
+        _ => RegionType::Allocated,
+    }
+}
+
+fn descriptor_to_region(descriptor: &MemoryDescriptor) -> MemRegion {
+    MemRegion {
+        start: descriptor.phys_start,
+        end: descriptor.phys_start + (descriptor.page_count * PAGE_SIZE),
+        ty: descriptor_type_to_region_type(descriptor.ty),
+    }
+}
+
+pub fn get_memory_map(boot_services: &BootServices) -> Result<Vec<MemRegion>, uefi::Error> {
     let MemoryMapSize {
         entry_size,
         mut map_size,
@@ -25,5 +42,5 @@ pub fn get_memory_map(boot_services: &BootServices) -> Result<Vec<MemoryDescript
 
     let (_, descriptors) = boot_services.memory_map(buffer)?;
 
-    Ok(descriptors.copied().collect())
+    Ok(descriptors.map(descriptor_to_region).collect())
 }

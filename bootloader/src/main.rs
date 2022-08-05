@@ -6,7 +6,8 @@ extern crate alloc;
 
 use core::fmt::Write;
 
-use uefi::{prelude::*, table::boot::MemoryType};
+use common::RegionType;
+use uefi::prelude::*;
 
 mod fs;
 mod mem;
@@ -36,21 +37,19 @@ fn uefi_main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     )
     .unwrap();
 
-    let mem_map = mem_map::get_memory_map(system_table.boot_services())
-        .expect("Failed to retrieve memory map.")
-        .clone();
+    let mem_regions = mem_map::get_memory_map(system_table.boot_services())
+        .expect("Failed to retrieve memory map.");
 
-    for descriptor in mem_map
+    for region in mem_regions
         .iter()
-        .filter(|descriptor| descriptor.ty == MemoryType::CONVENTIONAL)
+        .filter(|region| matches!(region.ty, RegionType::Usable))
     {
         writeln!(
             system_table.stdout(),
-            "P: {:#x} V: {:#x} | {} pages ({:?}) ",
-            descriptor.phys_start,
-            descriptor.virt_start,
-            descriptor.page_count,
-            descriptor.ty
+            "{:?} ({:#10x} - {:#10x})",
+            region.ty,
+            region.start,
+            region.end
         )
         .unwrap();
     }
