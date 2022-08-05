@@ -1,6 +1,7 @@
 # Rust build output dirs
 bootloader/target/
 kernel/target/
+common/target/
 
 # OVMF files, you're going to have to get these yourself
 ovmf/
