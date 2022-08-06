@@ -7,9 +7,11 @@ extern crate alloc;
 use core::fmt::Write;
 use core::slice;
 
+use graphics::Framebuffer;
 use uefi::prelude::*;
 
 mod fs;
+mod graphics;
 mod mem;
 
 use common::KMEM_START;
@@ -32,6 +34,11 @@ fn get_memory_map_size(boot_services: &BootServices) -> usize {
 #[entry]
 fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     uefi_services::init(&mut system_table).unwrap();
+
+    let gop = graphics::locate_gop(system_table.boot_services())
+        .expect("Failed to locate graphics protocol.");
+
+    let mut framebuffer = Framebuffer::new(gop).expect("Could not create framebufffer.");
 
     writeln!(system_table.stdout(), "Hello from ugoOS!").unwrap();
 
@@ -84,6 +91,12 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     let (runtime_table, descriptors) = system_table
         .exit_boot_services(handle, mem_map_buffer)
         .expect("Could not exit boot services.");
+
+    for x in 1..1000 {
+        for y in 1..1000 {
+            framebuffer.write(x, y, [255, 0, 0]);
+        }
+    }
 
     let mut frame = FrameAllocator::new(descriptors);
 
