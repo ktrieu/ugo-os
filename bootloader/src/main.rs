@@ -5,18 +5,32 @@
 extern crate alloc;
 
 use core::fmt::Write;
+use core::slice;
 
-use common::{RegionType, KMEM_START};
 use uefi::prelude::*;
 
 mod fs;
 mod mem;
 
-use mem::mem_map;
+use common::KMEM_START;
+use mem::frame::FrameAllocator;
 use mem::valloc;
+use uefi::table::boot::MemoryMapSize;
+use uefi::table::boot::MemoryType;
+
+fn get_memory_map_size(boot_services: &BootServices) -> usize {
+    let MemoryMapSize {
+        entry_size,
+        mut map_size,
+    } = boot_services.memory_map_size();
+    // Allocating memory might add a few descriptors, so just to be safe, reserve a few more
+    map_size += 2;
+
+    entry_size * map_size
+}
 
 #[entry]
-fn uefi_main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
+fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     uefi_services::init(&mut system_table).unwrap();
 
     writeln!(system_table.stdout(), "Hello from ugoOS!!").unwrap();
@@ -58,22 +72,24 @@ fn uefi_main(_handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     )
     .unwrap();
 
-    let mem_regions = mem_map::get_memory_map(system_table.boot_services())
-        .expect("Failed to retrieve memory map.");
+    let mem_map_buffer_size = get_memory_map_size(system_table.boot_services());
+    let mem_map_buffer = unsafe {
+        let raw_buffer = system_table
+            .boot_services()
+            .allocate_pool(MemoryType::LOADER_DATA, mem_map_buffer_size)
+            .expect("Could not allocate space for memory map.");
+        slice::from_raw_parts_mut(raw_buffer, mem_map_buffer_size)
+    };
 
-    for region in mem_regions
-        .iter()
-        .filter(|region| matches!(region.ty, RegionType::Usable))
-    {
-        writeln!(
-            system_table.stdout(),
-            "{:?} ({:#10x} - {:#10x})",
-            region.ty,
-            region.start,
-            region.end
-        )
-        .unwrap();
-    }
+    let (runtime_table, descriptors) = system_table
+        .exit_boot_services(handle, mem_map_buffer)
+        .expect("Could not exit boot services.");
+
+    let mut frame = FrameAllocator::new(descriptors);
+
+    // Test the frame allocator
+    let palloc_1 = frame.allocate(16).expect("Failed to allocate frames.");
+    let palloc_2 = frame.allocate(1).expect("Failed to allocate frames");
 
     loop {}
 }

@@ -1,2 +1,2 @@
-pub mod mem_map;
+pub mod frame;
 pub mod valloc;
