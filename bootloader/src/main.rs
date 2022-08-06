@@ -33,7 +33,7 @@ fn get_memory_map_size(boot_services: &BootServices) -> usize {
 fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     uefi_services::init(&mut system_table).unwrap();
 
-    writeln!(system_table.stdout(), "Hello from ugoOS!!").unwrap();
+    writeln!(system_table.stdout(), "Hello from ugoOS!").unwrap();
 
     let sfs = fs::locate_sfs(system_table.boot_services())
         .expect("Failed to locate filesystem protocol.");
