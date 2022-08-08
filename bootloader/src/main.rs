@@ -41,11 +41,7 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     let mut framebuffer = Framebuffer::new(gop).expect("Could not create framebufffer.");
     let mut console = Console::new(&mut framebuffer);
 
-    for i in b'A'..b'z' + 1 {
-        console.putchar(i);
-    }
-
-    writeln!(system_table.stdout(), "Hello from ugoOS!").unwrap();
+    writeln!(console, "Hello from ugoOS!").unwrap();
 
     let sfs = fs::locate_sfs(system_table.boot_services())
         .expect("Failed to locate filesystem protocol.");
@@ -57,7 +53,7 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         .expect("Failed to read kernel file.");
 
     writeln!(
-        system_table.stdout(),
+        console,
         "Kernel file loaded. File size: {}. ELF header: {:x?}.",
         file.len(),
         &file[0..4]
@@ -71,14 +67,14 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     let alloc_start_2 = valloc.allocate(2).unwrap();
 
     writeln!(
-        system_table.stdout(),
+        console,
         "Allocated 2 virtual pages starting at {:#x}",
         alloc_start_1
     )
     .unwrap();
 
     writeln!(
-        system_table.stdout(),
+        console,
         "Allocated 2 virtual pages starting at {:#x}",
         alloc_start_2
     )
@@ -93,7 +89,7 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         slice::from_raw_parts_mut(raw_buffer, mem_map_buffer_size)
     };
 
-    let (runtime_table, descriptors) = system_table
+    let (_, descriptors) = system_table
         .exit_boot_services(handle, mem_map_buffer)
         .expect("Could not exit boot services.");
 
@@ -102,6 +98,9 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     // Test the frame allocator
     let palloc_1 = frame.allocate(16).expect("Failed to allocate frames.");
     let palloc_2 = frame.allocate(1).expect("Failed to allocate frames");
+
+    writeln!(console, "Allocated 16 frames at {:#x}", palloc_1).unwrap();
+    writeln!(console, "Allocated 1 frame at {:#x}", palloc_2).unwrap();
 
     loop {}
 }

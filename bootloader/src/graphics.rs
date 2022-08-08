@@ -200,3 +200,13 @@ impl<'a> Console<'_> {
         };
     }
 }
+
+impl core::fmt::Write for Console<'_> {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        for b in s.as_bytes() {
+            self.putchar(*b);
+        }
+
+        Ok(())
+    }
+}
