@@ -152,7 +152,7 @@ impl<'a> Console<'_> {
         self.cy += 1;
         if self.cy >= self.cheight {
             self.cy = self.cheight - 1;
-            for row in (1..self.cheight) {
+            for row in 1..self.cheight {
                 let (_, src_frame_y) = self.char_to_framebuffer(0, row);
                 let (_, dst_frame_y) = self.char_to_framebuffer(0, row - 1);
                 for row_y in 0..CHARACTER_SIZE {
