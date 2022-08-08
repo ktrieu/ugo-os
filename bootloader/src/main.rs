@@ -7,7 +7,7 @@ extern crate alloc;
 use core::fmt::Write;
 use core::slice;
 
-use graphics::Framebuffer;
+use graphics::{Console, Framebuffer};
 use uefi::prelude::*;
 
 mod fs;
@@ -39,6 +39,11 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         .expect("Failed to locate graphics protocol.");
 
     let mut framebuffer = Framebuffer::new(gop).expect("Could not create framebufffer.");
+    let mut console = Console::new(&mut framebuffer);
+
+    for i in b'A'..b'z' + 1 {
+        console.putchar(i);
+    }
 
     writeln!(system_table.stdout(), "Hello from ugoOS!").unwrap();
 
@@ -91,12 +96,6 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     let (runtime_table, descriptors) = system_table
         .exit_boot_services(handle, mem_map_buffer)
         .expect("Could not exit boot services.");
-
-    for x in 1..1000 {
-        for y in 1..1000 {
-            framebuffer.write(x, y, [255, 0, 0]);
-        }
-    }
 
     let mut frame = FrameAllocator::new(descriptors);
 
