@@ -7,6 +7,7 @@ extern crate alloc;
 use core::fmt::Write;
 use core::slice;
 
+use common::PAGE_SIZE;
 use graphics::{Console, Framebuffer};
 use uefi::prelude::*;
 
@@ -93,10 +94,25 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         .exit_boot_services(handle, mem_map_buffer)
         .expect("Could not exit boot services.");
 
+    writeln!(console, "Free memory segments:").unwrap();
+    for d in descriptors
+        .clone()
+        .filter(|d| d.ty == MemoryType::CONVENTIONAL)
+    {
+        writeln!(
+            console,
+            "{:#x} - {:#x} ({} pages)",
+            d.phys_start,
+            d.phys_start + (PAGE_SIZE * d.page_count),
+            d.page_count
+        )
+        .unwrap();
+    }
+
     let mut frame = FrameAllocator::new(descriptors);
 
     // Test the frame allocator
-    let palloc_1 = frame.allocate(16).expect("Failed to allocate frames.");
+    let palloc_1 = frame.allocate(159).expect("Failed to allocate frames.");
     let palloc_2 = frame.allocate(1).expect("Failed to allocate frames");
 
     writeln!(console, "Allocated 16 frames at {:#x}", palloc_1).unwrap();

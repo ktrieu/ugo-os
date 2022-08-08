@@ -23,7 +23,7 @@ impl<'a, I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone> FrameAllocat
     }
 
     // Can we still use the current memory descriptor for allocating pages?
-    fn can_use_current_descriptor(&self, pages: u64) -> bool {
+    fn invalid_descriptor(&self, pages: u64) -> bool {
         let alloc_size = pages * PAGE_SIZE;
         match self.current_descriptor {
             Some(d) => {
@@ -41,7 +41,7 @@ impl<'a, I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone> FrameAllocat
     }
 
     pub fn allocate(&mut self, pages: u64) -> Result<u64, FrameAllocatorError> {
-        while !self.can_use_current_descriptor(pages) {
+        while self.invalid_descriptor(pages) {
             let next_descriptor = self
                 .descriptors
                 .next()
@@ -51,7 +51,7 @@ impl<'a, I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone> FrameAllocat
         }
 
         let alloc_start = self.current_addr;
-        self.current_addr += PAGE_SIZE;
+        self.current_addr += pages * PAGE_SIZE;
 
         Ok(alloc_start)
     }
