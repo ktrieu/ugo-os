@@ -5,6 +5,7 @@ pub struct FrameAllocator<'a, I: ExactSizeIterator<Item = &'a MemoryDescriptor> 
     descriptors: I,
     current_descriptor: Option<&'a MemoryDescriptor>,
     current_addr: u64,
+    total_physical_memory: u64,
 }
 
 #[derive(Debug)]
@@ -14,11 +15,16 @@ pub enum FrameAllocatorError {
 
 impl<'a, I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone> FrameAllocator<'a, I> {
     pub fn new(descriptors: I) -> Self {
+        let last_descriptor = descriptors.clone().last().unwrap();
+        let last_phys_address =
+            last_descriptor.phys_start + (PAGE_SIZE * last_descriptor.page_count);
+
         FrameAllocator {
             descriptors: descriptors,
             current_descriptor: None,
             // Start at 0x1000 to skip address 0, since we can't use it.
             current_addr: 0x1000,
+            total_physical_memory: last_phys_address,
         }
     }
 
@@ -54,5 +60,9 @@ impl<'a, I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone> FrameAllocat
         self.current_addr += pages * PAGE_SIZE;
 
         Ok(alloc_start)
+    }
+
+    pub fn total_physical_memory(&self) -> u64 {
+        self.total_physical_memory
     }
 }

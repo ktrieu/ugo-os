@@ -72,6 +72,14 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         .exit_boot_services(handle, mem_map_buffer)
         .expect("Could not exit boot services.");
 
+    let mut frame = FrameAllocator::new(descriptors.clone());
+    writeln!(
+        console,
+        "{} bytes of memory detected.",
+        frame.total_physical_memory()
+    )
+    .unwrap();
+
     writeln!(console, "Free memory segments:").unwrap();
     for d in descriptors
         .clone()
@@ -86,8 +94,6 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         )
         .unwrap();
     }
-
-    let mut frame = FrameAllocator::new(descriptors);
 
     loop {}
 }
