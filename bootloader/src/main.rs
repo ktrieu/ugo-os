@@ -15,9 +15,7 @@ mod fs;
 mod graphics;
 mod mem;
 
-use common::KMEM_START;
 use mem::frame::FrameAllocator;
-use mem::valloc;
 use uefi::table::boot::MemoryMapSize;
 use uefi::table::boot::MemoryType;
 
@@ -61,26 +59,6 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     )
     .unwrap();
 
-    let mut valloc = valloc::VirtualAllocator::new(KMEM_START);
-
-    // Test the virtual allocator
-    let alloc_start_1 = valloc.allocate(2).unwrap();
-    let alloc_start_2 = valloc.allocate(2).unwrap();
-
-    writeln!(
-        console,
-        "Allocated 2 virtual pages starting at {:#x}",
-        alloc_start_1
-    )
-    .unwrap();
-
-    writeln!(
-        console,
-        "Allocated 2 virtual pages starting at {:#x}",
-        alloc_start_2
-    )
-    .unwrap();
-
     let mem_map_buffer_size = get_memory_map_size(system_table.boot_services());
     let mem_map_buffer = unsafe {
         let raw_buffer = system_table
@@ -110,13 +88,6 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     }
 
     let mut frame = FrameAllocator::new(descriptors);
-
-    // Test the frame allocator
-    let palloc_1 = frame.allocate(159).expect("Failed to allocate frames.");
-    let palloc_2 = frame.allocate(1).expect("Failed to allocate frames");
-
-    writeln!(console, "Allocated 16 frames at {:#x}", palloc_1).unwrap();
-    writeln!(console, "Allocated 1 frame at {:#x}", palloc_2).unwrap();
 
     loop {}
 }
