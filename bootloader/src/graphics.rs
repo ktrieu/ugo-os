@@ -31,7 +31,7 @@ impl Framebuffer {
         let selected_mode = gop
             .modes()
             .filter(|m| matches!(m.info().pixel_format(), PixelFormat::Bgr))
-            .min_by(|a, b| {
+            .max_by(|a, b| {
                 let a_area = a.info().resolution().0 * a.info().resolution().1;
                 let b_area = b.info().resolution().0 * b.info().resolution().1;
 

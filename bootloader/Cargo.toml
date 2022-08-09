@@ -15,5 +15,6 @@ edition = "2021"
 [dependencies]
 uefi = "0.15.0"
 uefi-services = "0.12.0"
+x86_64 = "0.14.10"
 font8x8 = { version = "0.3", default-features = false }
 common = { path = "../common" }
