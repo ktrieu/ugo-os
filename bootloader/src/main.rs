@@ -37,7 +37,7 @@ fn get_memory_map_size(boot_services: &BootServices) -> usize {
 }
 
 fn create_page_table<'a, I>(
-    frame: &'a mut FrameAllocator<'a, I>,
+    frame: &mut FrameAllocator<'a, I>,
     virt: &mut VirtualAllocator,
 ) -> (VirtAddr, OffsetPageTable<'static>, u64)
 where
@@ -130,6 +130,7 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     let mut virt = VirtualAllocator::new(KMEM_START);
 
     let (phys_mem_offset, page_table, page_table_addr) = create_page_table(&mut frame, &mut virt);
+
     writeln!(
         console,
         "Mapping physical memory starting at {:#x}",
