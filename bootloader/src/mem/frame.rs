@@ -1,5 +1,9 @@
 use common::PAGE_SIZE;
 use uefi::table::boot::{MemoryDescriptor, MemoryType};
+use x86_64::{
+    structures::paging::{PhysFrame, Size4KiB},
+    PhysAddr,
+};
 
 pub struct FrameAllocator<'a, I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone> {
     descriptors: I,
@@ -64,5 +68,14 @@ impl<'a, I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone> FrameAllocat
 
     pub fn total_physical_memory(&self) -> u64 {
         self.total_physical_memory
+    }
+}
+
+unsafe impl<'a, I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone>
+    x86_64::structures::paging::FrameAllocator<Size4KiB> for FrameAllocator<'a, I>
+{
+    fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
+        let frame_addr = self.allocate(1).ok()?;
+        Some(PhysFrame::containing_address(PhysAddr::new(frame_addr)))
     }
 }

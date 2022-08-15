@@ -18,6 +18,10 @@ impl VirtualAllocator {
         }
     }
 
+    pub fn next_addr(&self) -> u64 {
+        self.next_addr
+    }
+
     pub fn allocate(&mut self, num_pages: u64) -> Result<u64, VirtualAllocError> {
         let end_addr = self.next_addr.checked_add(num_pages * PAGE_SIZE);
         match end_addr {

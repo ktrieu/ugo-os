@@ -10,11 +10,13 @@ use core::slice;
 use common::KMEM_START;
 use common::PAGE_SIZE;
 use graphics::{Console, Framebuffer};
+use loader::load_kernel;
 use mem::valloc::VirtualAllocator;
 use uefi::prelude::*;
 
 mod fs;
 mod graphics;
+mod loader;
 mod mem;
 
 use mem::frame::FrameAllocator;
@@ -129,7 +131,8 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
 
     let mut virt = VirtualAllocator::new(KMEM_START);
 
-    let (phys_mem_offset, page_table, page_table_addr) = create_page_table(&mut frame, &mut virt);
+    let (phys_mem_offset, mut page_table, page_table_addr) =
+        create_page_table(&mut frame, &mut virt);
 
     writeln!(
         console,
@@ -141,6 +144,15 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         console,
         "Creating kernel page table at {:#x}",
         page_table_addr
+    )
+    .unwrap();
+
+    load_kernel(file, &mut frame, &mut virt, &mut page_table).expect("Failed to load kernel!");
+
+    writeln!(
+        console,
+        "Kernel loaded.\nPage table:\n{:?}",
+        page_table.level_4_table().iter().find(|e| !e.is_unused())
     )
     .unwrap();
 
