@@ -8,7 +8,6 @@ use core::slice;
 
 use common::KMEM_START;
 use common::PAGE_SIZE;
-use graphics::{Console, Framebuffer};
 use loader::load_kernel;
 use logger::LOGGER;
 use mem::valloc::VirtualAllocator;
@@ -74,7 +73,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 #[entry]
-fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
+fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     let gop = graphics::locate_gop(system_table.boot_services())
         .expect("Failed to locate graphics protocol.");
 
