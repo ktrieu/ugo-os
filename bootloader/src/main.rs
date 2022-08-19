@@ -2,9 +2,8 @@
 #![no_std]
 #![feature(abi_efiapi)]
 
-extern crate alloc;
-
 use core::fmt::Write;
+use core::panic::PanicInfo;
 use core::slice;
 
 use common::KMEM_START;
@@ -67,10 +66,15 @@ where
     }
 }
 
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    bootlog!("{}", info);
+
+    loop {}
+}
+
 #[entry]
 fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
-    uefi_services::init(&mut system_table).unwrap();
-
     let gop = graphics::locate_gop(system_table.boot_services())
         .expect("Failed to locate graphics protocol.");
 

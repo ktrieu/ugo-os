@@ -153,17 +153,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "uefi-services"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "184cf782871dde6efd6335c0ed0dd7c48a7070f6ba73e1d148fc580a548dfe3d"
-dependencies = [
- "cfg-if",
- "log",
- "uefi",
-]
-
-[[package]]
 name = "ugo-os"
 version = "0.1.0"
 dependencies = [
@@ -172,7 +161,6 @@ dependencies = [
  "font8x8",
  "spin",
  "uefi",
- "uefi-services",
  "x86_64",
  "xmas-elf",
 ]
