@@ -17,7 +17,7 @@ pub struct Framebuffer {
 }
 
 #[derive(Debug)]
-pub enum FrameBufferError {
+pub enum FramebufferError {
     NoModes,
     ModeSetFailed(uefi::Error),
 }
@@ -26,7 +26,7 @@ pub enum FrameBufferError {
 const BYTES_PER_PIXEL: u32 = 4;
 
 impl Framebuffer {
-    pub fn new(gop: &mut GraphicsOutput) -> Result<Framebuffer, FrameBufferError> {
+    pub fn new(gop: &mut GraphicsOutput) -> Result<Framebuffer, FramebufferError> {
         // Just grab the RGB mode with the biggest combined area
         let selected_mode = gop
             .modes()
@@ -37,10 +37,10 @@ impl Framebuffer {
 
                 a_area.cmp(&b_area)
             })
-            .ok_or(FrameBufferError::NoModes)?;
+            .ok_or(FramebufferError::NoModes)?;
 
         gop.set_mode(&selected_mode)
-            .map_err(|err| FrameBufferError::ModeSetFailed(err))?;
+            .map_err(|err| FramebufferError::ModeSetFailed(err))?;
 
         Ok(Framebuffer {
             addr: gop.frame_buffer().as_mut_ptr(),
@@ -118,26 +118,27 @@ const PADDING: u32 = 4;
 const LINE_SPACING: u32 = 4;
 const CHAR_SPACING: u32 = 1;
 
-pub struct Console<'a> {
-    framebuffer: &'a mut Framebuffer,
+pub struct Console {
+    framebuffer: Framebuffer,
     cwidth: u32,
     cheight: u32,
     cx: u32,
     cy: u32,
 }
 
-impl<'a> Console<'_> {
-    pub fn new(framebuffer: &'a mut Framebuffer) -> Console<'a> {
+impl<'a> Console {
+    pub fn new(gop: &mut GraphicsOutput) -> Result<Console, FramebufferError> {
+        let framebuffer = Framebuffer::new(gop)?;
         let width = (framebuffer.width() - (2 * PADDING)) / (CHARACTER_SIZE + CHAR_SPACING);
         let height = (framebuffer.height() - (2 * PADDING)) / (CHARACTER_SIZE + LINE_SPACING);
 
-        Console {
+        Ok(Console {
             framebuffer: framebuffer,
             cwidth: width,
             cheight: height,
             cx: 0,
             cy: 0,
-        }
+        })
     }
 
     fn char_to_framebuffer(&self, cx: u32, cy: u32) -> (u32, u32) {
@@ -201,7 +202,7 @@ impl<'a> Console<'_> {
     }
 }
 
-impl core::fmt::Write for Console<'_> {
+impl core::fmt::Write for Console {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         for b in s.as_bytes() {
             self.putchar(*b);
@@ -210,3 +211,5 @@ impl core::fmt::Write for Console<'_> {
         Ok(())
     }
 }
+
+unsafe impl<'a> Send for Console {}

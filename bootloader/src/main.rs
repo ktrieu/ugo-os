@@ -11,12 +11,15 @@ use common::KMEM_START;
 use common::PAGE_SIZE;
 use graphics::{Console, Framebuffer};
 use loader::load_kernel;
+use logger::LOGGER;
 use mem::valloc::VirtualAllocator;
 use uefi::prelude::*;
 
 mod fs;
 mod graphics;
 mod loader;
+#[macro_use]
+mod logger;
 mod mem;
 
 use mem::frame::FrameAllocator;
@@ -71,10 +74,9 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     let gop = graphics::locate_gop(system_table.boot_services())
         .expect("Failed to locate graphics protocol.");
 
-    let mut framebuffer = Framebuffer::new(gop).expect("Could not create framebufffer.");
-    let mut console = Console::new(&mut framebuffer);
+    logger::logger_init(gop);
 
-    writeln!(console, "Hello from ugoOS!").unwrap();
+    bootlog!("Hello from ugoOS!");
 
     let sfs = fs::locate_sfs(system_table.boot_services())
         .expect("Failed to locate filesystem protocol.");
@@ -85,13 +87,11 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     let file = fs::read_file_data(system_table.boot_services(), &mut kernel_file)
         .expect("Failed to read kernel file.");
 
-    writeln!(
-        console,
+    bootlog!(
         "Kernel file loaded. File size: {}. ELF header: {:x?}.",
         file.len(),
         &file[0..4]
-    )
-    .unwrap();
+    );
 
     let mem_map_buffer_size = get_memory_map_size(system_table.boot_services());
     let mem_map_buffer = unsafe {
@@ -107,26 +107,22 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
         .expect("Could not exit boot services.");
 
     let mut frame = FrameAllocator::new(descriptors.clone());
-    writeln!(
-        console,
+    bootlog!(
         "{} bytes of memory detected.",
         frame.total_physical_memory()
-    )
-    .unwrap();
+    );
 
-    writeln!(console, "Free memory segments:").unwrap();
+    bootlog!("Free memory segments:");
     for d in descriptors
         .clone()
         .filter(|d| d.ty == MemoryType::CONVENTIONAL)
     {
-        writeln!(
-            console,
+        bootlog!(
             "{:#x} - {:#x} ({} pages)",
             d.phys_start,
             d.phys_start + (PAGE_SIZE * d.page_count),
             d.page_count
-        )
-        .unwrap();
+        );
     }
 
     let mut virt = VirtualAllocator::new(KMEM_START);
@@ -134,27 +130,15 @@ fn uefi_main(handle: Handle, mut system_table: SystemTable<Boot>) -> Status {
     let (phys_mem_offset, mut page_table, page_table_addr) =
         create_page_table(&mut frame, &mut virt);
 
-    writeln!(
-        console,
-        "Mapping physical memory starting at {:#x}",
-        phys_mem_offset
-    )
-    .unwrap();
-    writeln!(
-        console,
-        "Creating kernel page table at {:#x}",
-        page_table_addr
-    )
-    .unwrap();
+    bootlog!("Mapping physical memory starting at {:#x}", phys_mem_offset);
+    bootlog!("Creating kernel page table at {:#x}", page_table_addr);
 
     load_kernel(file, &mut frame, &mut virt, &mut page_table).expect("Failed to load kernel!");
 
-    writeln!(
-        console,
+    bootlog!(
         "Kernel loaded.\nPage table:\n{:?}",
         page_table.level_4_table().iter().find(|e| !e.is_unused())
-    )
-    .unwrap();
+    );
 
     loop {}
 }
