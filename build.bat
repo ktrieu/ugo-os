@@ -1,0 +1,1 @@
+python buildscript/build.py %1
