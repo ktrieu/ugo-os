@@ -10,7 +10,8 @@ macro_rules! bootlog {
         // IMPORTANT: We need to wrap this in a block so the lock gets unlocked. Macros don't introduce blocks on their own
         // so we have to do this ourselves.
         {
-            let mut console = LOGGER.try_get().unwrap().lock();
+            use core::fmt::Write;
+            let mut console = $crate::logger::LOGGER.try_get().unwrap().lock();
             writeln!(console, $($args)*).unwrap()
         }
     };
