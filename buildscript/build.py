@@ -36,7 +36,8 @@ def get_kernel_path(path=""):
 def run_cmd_in_dir(cmd, args, dir="./"):
     p = subprocess.Popen([cmd, *args], cwd=dir)
     exit_val = p.wait()
-    return exit_val == 0
+    if exit_val != 0:
+        raise RuntimeError(f"Command failed: {cmd} {' '.join(args)}")
 
 
 # Commands
@@ -101,12 +102,15 @@ if __name__ == "__main__":
 
     cmd_name = sys.argv[1]
 
-    if cmd_name == "build":
-        cmd_build()
-    elif cmd_name == "install":
-        cmd_install()
-    elif cmd_name == "run":
-        cmd_run()
-    else:
-        usage()
-        sys.exit(1)
+    try:
+        if cmd_name == "build":
+            cmd_build()
+        elif cmd_name == "install":
+            cmd_install()
+        elif cmd_name == "run":
+            cmd_run()
+        else:
+            usage()
+            sys.exit(1)
+    except RuntimeError as e:
+        print(e)
