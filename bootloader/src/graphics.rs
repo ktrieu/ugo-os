@@ -1,14 +1,16 @@
 use uefi::{
     prelude::BootServices,
     proto::console::gop::{GraphicsOutput, ModeInfo, PixelFormat},
+    table::boot::ScopedProtocol,
 };
 
 use font8x8::legacy::BASIC_LEGACY;
 
-pub fn locate_gop<'a>(boot_services: &'a BootServices) -> Result<&mut GraphicsOutput, uefi::Error> {
-    boot_services
-        .locate_protocol::<GraphicsOutput>()
-        .map(|graphics_protocol| unsafe { &mut *graphics_protocol.get() })
+pub fn locate_gop<'a>(
+    boot_services: &'a BootServices,
+) -> Result<ScopedProtocol<GraphicsOutput>, uefi::Error> {
+    let handle = boot_services.get_handle_for_protocol::<GraphicsOutput>()?;
+    boot_services.open_protocol_exclusive(handle)
 }
 
 pub struct Framebuffer {
@@ -26,7 +28,7 @@ pub enum FramebufferError {
 const BYTES_PER_PIXEL: u32 = 4;
 
 impl Framebuffer {
-    pub fn new(gop: &mut GraphicsOutput) -> Result<Framebuffer, FramebufferError> {
+    pub fn new(gop: &mut ScopedProtocol<GraphicsOutput>) -> Result<Framebuffer, FramebufferError> {
         // Just grab the RGB mode with the biggest combined area
         let selected_mode = gop
             .modes()
@@ -127,7 +129,7 @@ pub struct Console {
 }
 
 impl<'a> Console {
-    pub fn new(gop: &mut GraphicsOutput) -> Result<Console, FramebufferError> {
+    pub fn new(gop: &mut ScopedProtocol<GraphicsOutput>) -> Result<Console, FramebufferError> {
         let framebuffer = Framebuffer::new(gop)?;
         let width = (framebuffer.width() - (2 * PADDING)) / (CHARACTER_SIZE + CHAR_SPACING);
         let height = (framebuffer.height() - (2 * PADDING)) / (CHARACTER_SIZE + LINE_SPACING);

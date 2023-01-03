@@ -6,11 +6,13 @@ use uefi::{
         file::{Directory, File, FileAttribute, FileInfo, FileMode, FileType, RegularFile},
         fs::SimpleFileSystem,
     },
-    table::boot::{AllocateType, MemoryType},
+    table::boot::{AllocateType, MemoryType, ScopedProtocol},
     CStr16, Status,
 };
 
-pub fn open_root_volume(sfs: &mut SimpleFileSystem) -> Result<Directory, uefi::Error> {
+pub fn open_root_volume(
+    sfs: &mut ScopedProtocol<SimpleFileSystem>,
+) -> Result<Directory, uefi::Error> {
     sfs.open_volume()
 }
 
@@ -56,9 +58,9 @@ fn get_file_size(boot_services: &BootServices, file: &mut RegularFile) -> Result
     return file_size;
 }
 
-pub fn read_file_data<'a>(
-    boot_services: &BootServices,
-    file: &'a mut RegularFile,
+pub fn read_file_data<'a, 'b>(
+    boot_services: &'a BootServices,
+    file: &'b mut RegularFile,
 ) -> Result<&'a [u8], uefi::Error> {
     let file_size: usize = get_file_size(boot_services, file)?
         .try_into()
@@ -78,8 +80,7 @@ pub fn read_file_data<'a>(
 
 pub fn locate_sfs<'a>(
     boot_services: &'a BootServices,
-) -> Result<&mut SimpleFileSystem, uefi::Error> {
-    boot_services
-        .locate_protocol::<SimpleFileSystem>()
-        .map(|protocol_ref| unsafe { &mut *protocol_ref.get() })
+) -> Result<ScopedProtocol<SimpleFileSystem>, uefi::Error> {
+    let handle = boot_services.get_handle_for_protocol::<SimpleFileSystem>()?;
+    boot_services.open_protocol_exclusive::<SimpleFileSystem>(handle)
 }

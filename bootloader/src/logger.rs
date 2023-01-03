@@ -1,5 +1,5 @@
 use conquer_once::spin::OnceCell;
-use uefi::proto::console::gop::GraphicsOutput;
+use uefi::{proto::console::gop::GraphicsOutput, table::boot::ScopedProtocol};
 
 use crate::graphics::Console;
 
@@ -17,6 +17,6 @@ macro_rules! bootlog {
     };
 }
 
-pub fn logger_init(gop: &mut GraphicsOutput) {
+pub fn logger_init(gop: &mut ScopedProtocol<GraphicsOutput>) {
     LOGGER.init_once(|| spin::Mutex::new(Console::new(gop).expect("Failed to create console.")));
 }
