@@ -1,7 +1,7 @@
 use core::slice;
 
 use uefi::{
-    prelude::BootServices,
+    prelude::{cstr16, BootServices},
     proto::media::{
         file::{Directory, File, FileAttribute, FileInfo, FileMode, FileType, RegularFile},
         fs::SimpleFileSystem,
@@ -16,15 +16,10 @@ pub fn open_root_volume(
     sfs.open_volume()
 }
 
-pub fn open_kernel_file(dir: &mut Directory) -> Result<RegularFile, uefi::Error> {
-    // The open function only takes CStr16's, and converting it is sort of involved...
-    let mut buf: [u16; 11] = [0; 11]; // 10 chars for the name, plus 1 for null terminator
+const KERNEL_FILENAME: &CStr16 = cstr16!("ugo-os.elf");
 
-    let handle = dir.open(
-        CStr16::from_str_with_buf("ugo-os.elf", &mut buf).unwrap(),
-        FileMode::Read,
-        FileAttribute::VALID_ATTR,
-    )?;
+pub fn open_kernel_file(dir: &mut Directory) -> Result<RegularFile, uefi::Error> {
+    let handle = dir.open(KERNEL_FILENAME, FileMode::Read, FileAttribute::VALID_ATTR)?;
 
     match handle.into_type() {
         Ok(FileType::Regular(file)) => Ok(file),
