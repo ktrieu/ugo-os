@@ -5,7 +5,7 @@
 use core::fmt::Display;
 
 use common::{PAGE_SIZE, PHYSADDR_SIZE};
-
+#[derive(PartialEq, PartialOrd, Clone, Copy)]
 pub struct PhysAddr(u64);
 
 impl PhysAddr {
@@ -22,7 +22,7 @@ impl PhysAddr {
         PhysAddr(addr)
     }
 
-    pub fn align_down(self, align: u64) -> PhysAddr {
+    pub fn align_down(&self, align: u64) -> PhysAddr {
         if !align.is_power_of_two() {
             panic!("Cannot align to non power of two alignment {align}!")
         }
@@ -30,10 +30,14 @@ impl PhysAddr {
         PhysAddr(self.0 & !(align - 1))
     }
 
-    pub fn align_up(self, align: u64) -> PhysAddr {
+    pub fn align_up(&self, align: u64) -> PhysAddr {
         let aligned_down = self.align_down(align);
 
         PhysAddr(aligned_down.0 + align)
+    }
+
+    pub fn is_aligned(&self, align: u64) -> bool {
+        self.align_down(align) == *self
     }
 
     pub fn as_u64(self) -> u64 {
@@ -41,16 +45,38 @@ impl PhysAddr {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct PhysFrame(PhysAddr);
 
 impl PhysFrame {
-    pub fn from_phys_addr(addr: PhysAddr) -> PhysFrame {
+    pub fn from_containing_phys_addr(addr: PhysAddr) -> PhysFrame {
         let base_addr = addr.align_down(PAGE_SIZE);
 
         PhysFrame(base_addr)
     }
 
-    pub fn base_addr(self) -> PhysAddr {
+    pub fn from_base_phys_addr(addr: PhysAddr) -> PhysFrame {
+        assert!(
+            addr.is_aligned(PAGE_SIZE),
+            "Provided unaligned base address for PhysFrame!"
+        );
+
+        PhysFrame(addr)
+    }
+
+    pub fn next_frame(&self) -> PhysFrame {
+        PhysFrame::from_base_u64(self.base_addr().as_u64() + PAGE_SIZE)
+    }
+
+    pub fn from_base_u64(addr: u64) -> PhysFrame {
+        PhysFrame::from_base_phys_addr(PhysAddr::new(addr))
+    }
+
+    pub fn from_containing_u64(addr: u64) -> PhysFrame {
+        PhysFrame::from_containing_phys_addr(PhysAddr::new(addr))
+    }
+
+    pub fn base_addr(&self) -> PhysAddr {
         self.0
     }
 }
