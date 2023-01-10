@@ -1,5 +1,21 @@
 use common::{PAGE_SIZE, PHYSADDR_SIZE, VIRTADDR_SIZE};
 
+fn align_down(addr: u64, align: u64) -> u64 {
+    if !align.is_power_of_two() {
+        panic!("Cannot align to non power of two alignment {align}!")
+    }
+
+    addr & !(align - 1)
+}
+
+fn align_up(addr: u64, align: u64) -> u64 {
+    align_down(addr, align) + align
+}
+
+fn is_aligned(addr: u64, align: u64) -> bool {
+    align_down(addr, align) == addr
+}
+
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
 pub struct PhysAddr(u64);
 
@@ -18,21 +34,15 @@ impl PhysAddr {
     }
 
     pub fn align_down(&self, align: u64) -> PhysAddr {
-        if !align.is_power_of_two() {
-            panic!("Cannot align to non power of two alignment {align}!")
-        }
-
-        PhysAddr(self.0 & !(align - 1))
+        PhysAddr(align_down(self.0, align))
     }
 
     pub fn align_up(&self, align: u64) -> PhysAddr {
-        let aligned_down = self.align_down(align);
-
-        PhysAddr(aligned_down.0 + align)
+        PhysAddr(align_up(self.0, align))
     }
 
     pub fn is_aligned(&self, align: u64) -> bool {
-        self.align_down(align) == *self
+        is_aligned(self.0, align)
     }
 
     pub fn as_u64(self) -> u64 {
@@ -133,5 +143,39 @@ impl VirtAddr {
         self.0
             & VirtAddr::PAGE_MAP_L4_IDX_MASK
                 >> VirtAddr::ENTRY_IDX_SIZE * 3 + VirtAddr::PAGE_OFFSET_SIZE
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        self.0
+    }
+
+    pub fn align_up(&self, align: u64) -> VirtAddr {
+        VirtAddr(align_up(self.0, align))
+    }
+
+    pub fn align_down(&self, align: u64) -> VirtAddr {
+        VirtAddr(align_down(self.0, align))
+    }
+
+    pub fn is_aligned(&self, align: u64) -> bool {
+        is_aligned(self.0, align)
+    }
+}
+
+pub struct VirtPage(VirtAddr);
+
+impl VirtPage {
+    pub fn from_containing_addr(addr: VirtAddr) -> VirtPage {
+        VirtPage(addr.align_down(PAGE_SIZE))
+    }
+
+    pub fn from_base_addr(addr: VirtAddr) -> VirtPage {
+        assert!(
+            addr.is_aligned(PAGE_SIZE),
+            "Virtual address {:016x} is not aligned to a page boundary!",
+            addr.as_u64()
+        );
+
+        VirtPage(addr)
     }
 }
