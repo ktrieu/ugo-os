@@ -13,6 +13,9 @@ pub const PAGE_SIZE: u64 = 4096;
 // This is the number of bits that are allowed to be set in a physical address.
 pub const PHYSADDR_SIZE: u8 = 52;
 
+// This is the number of bits that are used in a virtual address. The upper bits must be sign-extended.
+pub const VIRTADDR_SIZE: u8 = 48;
+
 #[derive(Debug, Clone, Copy)]
 pub enum RegionType {
     Usable,
