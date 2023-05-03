@@ -5,16 +5,23 @@
 use core::panic::PanicInfo;
 use core::slice;
 
+use common::PAGE_SIZE;
 use uefi::prelude::*;
 
 #[macro_use]
 mod logger;
 
+mod addr;
+mod frame;
 mod fs;
 mod graphics;
+mod mappings;
+mod page;
 
 use uefi::table::boot::MemoryMapSize;
 use uefi::table::boot::MemoryType;
+
+use crate::frame::FrameAllocator;
 
 fn get_memory_map_size(boot_services: &BootServices) -> usize {
     let MemoryMapSize {
@@ -73,9 +80,38 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
         slice::from_raw_parts_mut(raw_buffer, mem_map_buffer_size)
     };
 
-    let (_, _descriptors) = system_table
+    let (_, descriptors) = system_table
         .exit_boot_services(handle, mem_map_buffer)
         .expect("Could not exit boot services.");
+
+    // DEBUG: Print memory map
+    for d in descriptors
+        .clone()
+        .filter(|d| d.ty == MemoryType::CONVENTIONAL)
+    {
+        bootlog!(
+            "({:#016x}-{:#016x}) {:?}",
+            d.phys_start,
+            d.phys_start + (PAGE_SIZE * d.page_count),
+            d.ty,
+        )
+    }
+
+    let mut frame_allocator = FrameAllocator::new(descriptors.clone());
+
+    // Allocate some frames so we can see if this works
+    let mut last_frame = frame_allocator.alloc_frame();
+    for _ in 0..256 {
+        let frame = frame_allocator.alloc_frame();
+        if frame.base_addr().as_u64() - last_frame.base_addr().as_u64() > PAGE_SIZE {
+            bootlog!(
+                "Frame gap: {:#016x} - {:#016x}",
+                last_frame.base_addr().as_u64(),
+                frame.base_addr().as_u64()
+            )
+        }
+        last_frame = frame;
+    }
 
     loop {}
 }
