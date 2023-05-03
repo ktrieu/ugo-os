@@ -4,8 +4,20 @@ use core::{fmt::Debug, ops, slice};
 
 // The end of the x86-64 low canonical addresses. This marks the end of userspace memory.
 pub const UMEM_END: u64 = 0x0000_7FFF_FFFF_FFFF;
+
 // The start of the x86-64 high canonical addresses. We'll be using this to indicate kernel memory.
 pub const KMEM_START: u64 = 0xFFFF_8000_0000_0000;
+
+// The maximum amount of physical memory we'll support (64 TB).
+pub const PHYSMEM_MAX: u64 = 64 * 1024 * 1024 * 1024 * 1024;
+
+pub const BOOTINFO_START: u64 = KMEM_START + PHYSMEM_MAX;
+
+// The virtual address space reserved for boot information (1 GB)
+pub const BOOTINFO_SIZE: u64 = 1024 * 1024 * 1024;
+
+// The start address of the kernel code/data.
+pub const KERNEL_START: u64 = BOOTINFO_START + BOOTINFO_SIZE;
 
 // This is the default. If we have configurable page sizes later, it will be a huge success for this project.
 pub const PAGE_SIZE: u64 = 4096;
