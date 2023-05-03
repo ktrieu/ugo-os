@@ -5,8 +5,12 @@
 use core::fmt::Display;
 
 use common::{PAGE_SIZE, PHYSADDR_SIZE};
+use uefi::table::boot::MemoryDescriptor;
 
-use crate::addr::PhysAddr;
+use crate::{
+    addr::{PhysAddr, PhysFrame, VirtAddr, VirtPage},
+    frame::FrameAllocator,
+};
 
 pub struct PageTableEntry {
     entry: u64,
@@ -72,6 +76,10 @@ impl PageTableEntry {
         let aligned = addr.align_down(PAGE_SIZE);
         self.entry |= aligned.as_u64();
     }
+
+    pub fn clear(&mut self) {
+        self.entry = 0;
+    }
 }
 
 impl Display for PageTableEntry {
@@ -95,23 +103,151 @@ impl Display for PageTableEntry {
 }
 
 const NUM_PAGE_TABLE_ENTRIES: usize = 512;
+type PageTableEntries = [PageTableEntry; NUM_PAGE_TABLE_ENTRIES];
 
-#[repr(C, align(4096))]
-struct PageMapLevel4 {
+pub trait PageTable: Sized {
+    fn entries(&self) -> &PageTableEntries;
+    fn entries_mut(&mut self) -> &mut PageTableEntries;
+    fn get_entry_idx(addr: VirtAddr) -> usize;
+
+    fn clear(&mut self) {
+        for e in self.entries_mut() {
+            e.clear();
+        }
+    }
+
+    fn alloc_new<'a, I>(allocator: &mut FrameAllocator<'a, I>) -> (&'a mut Self, PhysAddr)
+    where
+        I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone,
+    {
+        let frame = allocator.alloc_frame();
+
+        // Safety: An intermediate page table can fit into exactly one physical frame, which is returned for use
+        // by the FrameAllocator. The page table is cleared to a valid state.
+        unsafe {
+            let ptr = frame.base_addr().as_u64() as *mut Self;
+            let reference = &mut *ptr;
+            reference.clear();
+            (reference, frame.base_addr())
+        }
+    }
+
+    fn get_entry_mut(&mut self, addr: VirtAddr) -> &mut PageTableEntry {
+        self.entries_mut()
+            .get_mut(Self::get_entry_idx(addr))
+            .expect("Page entry index out of range!")
+    }
+
+    unsafe fn from_phys_addr<'a>(addr: PhysAddr) -> &'a mut Self {
+        &mut *(addr.as_u64() as *mut Self)
+    }
+}
+
+pub trait IntermediatePageTable<E: PageTable>: PageTable {
+    fn insert<'a, I>(
+        &'a mut self,
+        allocator: &'a mut FrameAllocator<'a, I>,
+        addr: VirtAddr,
+    ) -> &'a mut E
+    where
+        I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone,
+    {
+        let (new_table, new_addr) = E::alloc_new(allocator);
+        // All indexes are 9 bits, and we have a capacity of 512, so this should always succeed.
+        let entry = self.get_entry_mut(addr);
+        entry.set_addr(new_addr);
+
+        new_table
+    }
+
+    fn get_mut<'a>(&'a mut self, addr: VirtAddr) -> Option<&'a mut E> {
+        // We're masking out 9 bits = 512, so this should always succeed.
+        let entry = self.get_entry_mut(addr);
+
+        if entry.present() {
+            // Safety: The only way to insert an address into the table is via
+            // insert, which always inserts a valid address from FrameAllocator.
+            unsafe { Some(E::from_phys_addr(entry.addr())) }
+        } else {
+            None
+        }
+    }
+}
+
+pub struct PageMapLevel4 {
     entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
 }
 
-#[repr(C, align(4096))]
-struct PageDirPointerTable {
+impl PageTable for PageMapLevel4 {
+    fn entries(&self) -> &PageTableEntries {
+        &self.entries
+    }
+
+    fn entries_mut(&mut self) -> &mut PageTableEntries {
+        &mut self.entries
+    }
+
+    fn get_entry_idx(addr: VirtAddr) -> usize {
+        addr.get_page_map_l4_idx() as usize
+    }
+}
+
+impl IntermediatePageTable<PageMapLevel3> for PageMapLevel4 {}
+
+pub struct PageMapLevel3 {
     entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
 }
 
-#[repr(C, align(4096))]
-struct PageDir {
+impl PageTable for PageMapLevel3 {
+    fn entries(&self) -> &PageTableEntries {
+        &self.entries
+    }
+
+    fn entries_mut(&mut self) -> &mut PageTableEntries {
+        &mut self.entries
+    }
+
+    fn get_entry_idx(addr: VirtAddr) -> usize {
+        addr.get_page_dir_ptr_idx() as usize
+    }
+}
+
+impl IntermediatePageTable<PageMapLevel2> for PageMapLevel3 {}
+
+pub struct PageMapLevel2 {
     entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
 }
 
-#[repr(C, align(4096))]
-struct PageTable {
+impl PageTable for PageMapLevel2 {
+    fn entries(&self) -> &PageTableEntries {
+        &self.entries
+    }
+
+    fn entries_mut(&mut self) -> &mut PageTableEntries {
+        &mut self.entries
+    }
+
+    fn get_entry_idx(addr: VirtAddr) -> usize {
+        addr.get_page_dir_idx() as usize
+    }
+}
+
+impl IntermediatePageTable<PageMapLevel1> for PageMapLevel2 {}
+
+pub struct PageMapLevel1 {
     entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
+}
+
+impl PageTable for PageMapLevel1 {
+    fn entries(&self) -> &PageTableEntries {
+        &self.entries
+    }
+
+    fn entries_mut(&mut self) -> &mut PageTableEntries {
+        &mut self.entries
+    }
+
+    fn get_entry_idx(addr: VirtAddr) -> usize {
+        addr.get_page_table_idx() as usize
+    }
 }

@@ -178,4 +178,8 @@ impl VirtPage {
 
         VirtPage(addr)
     }
+
+    pub fn get_base_addr(&self) -> VirtAddr {
+        self.0
+    }
 }
