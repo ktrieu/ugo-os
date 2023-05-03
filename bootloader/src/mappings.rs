@@ -13,10 +13,7 @@ pub struct Mappings<'a> {
 }
 
 impl<'a> Mappings<'a> {
-    pub fn new<I>(allocator: &mut FrameAllocator<'a, I>) -> Self
-    where
-        I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone,
-    {
+    pub fn new<I>(allocator: &mut FrameAllocator) -> Self {
         let (level_4_map, level_4_phys_addr) = PageMapLevel4::alloc_new(allocator);
         Mappings {
             level_4_map,
@@ -24,9 +21,5 @@ impl<'a> Mappings<'a> {
         }
     }
 
-    pub fn map_page<'b, I>(frame: PhysFrame, page: VirtPage, allocator: &mut FrameAllocator<'b, I>)
-    where
-        I: ExactSizeIterator<Item = &'b MemoryDescriptor> + Clone,
-    {
-    }
+    pub fn map_page<I>(frame: PhysFrame, page: VirtPage, allocator: &mut FrameAllocator) {}
 }

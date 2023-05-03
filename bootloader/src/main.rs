@@ -57,6 +57,9 @@ fn read_kernel_file(boot_services: &BootServices) -> &[u8] {
     fs::read_file_data(boot_services, &mut kernel_file).expect("Failed to read kernel file.")
 }
 
+// We grab at least 256 frames (1 GB) of physical memory for boot purposes
+const MIN_BOOT_PHYS_FRAMES: u64 = 256;
+
 #[entry]
 fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     init_logger(&system_table.boot_services());
@@ -97,21 +100,12 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
         )
     }
 
-    let mut frame_allocator = FrameAllocator::new(descriptors.clone());
-
-    // Allocate some frames so we can see if this works
-    let mut last_frame = frame_allocator.alloc_frame();
-    for _ in 0..256 {
-        let frame = frame_allocator.alloc_frame();
-        if frame.base_addr().as_u64() - last_frame.base_addr().as_u64() > PAGE_SIZE {
-            bootlog!(
-                "Frame gap: {:#016x} - {:#016x}",
-                last_frame.base_addr().as_u64(),
-                frame.base_addr().as_u64()
-            )
-        }
-        last_frame = frame;
-    }
+    let mut frame_allocator = FrameAllocator::new(descriptors.clone(), MIN_BOOT_PHYS_FRAMES);
+    bootlog!(
+        "Reserved physical memory for boot. ({:#016x}-{:#016x}",
+        frame_allocator.alloc_start().as_u64(),
+        frame_allocator.alloc_end().as_u64()
+    );
 
     loop {}
 }

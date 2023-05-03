@@ -5,10 +5,9 @@
 use core::fmt::Display;
 
 use common::{PAGE_SIZE, PHYSADDR_SIZE};
-use uefi::table::boot::MemoryDescriptor;
 
 use crate::{
-    addr::{PhysAddr, PhysFrame, VirtAddr, VirtPage},
+    addr::{PhysAddr, VirtAddr},
     frame::FrameAllocator,
 };
 
@@ -116,10 +115,7 @@ pub trait PageTable: Sized {
         }
     }
 
-    fn alloc_new<'a, I>(allocator: &mut FrameAllocator<'a, I>) -> (&'a mut Self, PhysAddr)
-    where
-        I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone,
-    {
+    fn alloc_new<'a>(allocator: &mut FrameAllocator) -> (&'a mut Self, PhysAddr) {
         let frame = allocator.alloc_frame();
 
         // Safety: An intermediate page table can fit into exactly one physical frame, which is returned for use
@@ -144,14 +140,7 @@ pub trait PageTable: Sized {
 }
 
 pub trait IntermediatePageTable<E: PageTable>: PageTable {
-    fn insert<'a, I>(
-        &'a mut self,
-        allocator: &'a mut FrameAllocator<'a, I>,
-        addr: VirtAddr,
-    ) -> &'a mut E
-    where
-        I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone,
-    {
+    fn insert<'a, I>(&'a mut self, allocator: &'a mut FrameAllocator, addr: VirtAddr) -> &'a mut E {
         let (new_table, new_addr) = E::alloc_new(allocator);
         // All indexes are 9 bits, and we have a capacity of 512, so this should always succeed.
         let entry = self.get_entry_mut(addr);

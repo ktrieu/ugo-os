@@ -69,8 +69,12 @@ impl PhysFrame {
         PhysFrame(addr)
     }
 
+    pub fn frame_end_exclusive(&self, frames: u64) -> PhysFrame {
+        PhysFrame::from_base_u64(self.base_addr().as_u64() + frames * PAGE_SIZE)
+    }
+
     pub fn next_frame(&self) -> PhysFrame {
-        PhysFrame::from_base_u64(self.base_addr().as_u64() + PAGE_SIZE)
+        self.frame_end_exclusive(0)
     }
 
     pub fn from_base_u64(addr: u64) -> PhysFrame {
