@@ -140,7 +140,7 @@ pub trait PageTable: Sized {
 }
 
 pub trait IntermediatePageTable<E: PageTable>: PageTable {
-    fn insert<'a, I>(&'a mut self, allocator: &'a mut FrameAllocator, addr: VirtAddr) -> &'a mut E {
+    fn insert<'a>(&'a mut self, addr: VirtAddr, allocator: &mut FrameAllocator) -> &'a mut E {
         let (new_table, new_addr) = E::alloc_new(allocator);
         // All indexes are 9 bits, and we have a capacity of 512, so this should always succeed.
         let entry = self.get_entry_mut(addr);
@@ -159,6 +159,22 @@ pub trait IntermediatePageTable<E: PageTable>: PageTable {
             unsafe { Some(E::from_phys_addr(entry.addr())) }
         } else {
             None
+        }
+    }
+
+    fn get_mut_or_insert(&mut self, addr: VirtAddr, allocator: &mut FrameAllocator) -> &mut E {
+        // We're masking out 9 bits = 512, so this should always succeed.
+        let entry = self.get_entry_mut(addr);
+
+        if entry.present() {
+            // Safety: The only way to insert an address into the table is via
+            // insert, which always inserts a valid address from FrameAllocator.
+            unsafe { E::from_phys_addr(entry.addr()) }
+        } else {
+            let (new_table, new_addr) = E::alloc_new(allocator);
+            entry.set_addr(new_addr);
+
+            new_table
         }
     }
 }

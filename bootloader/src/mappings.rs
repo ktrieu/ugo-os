@@ -1,10 +1,8 @@
-use uefi::table::boot::MemoryDescriptor;
-
 use crate::{
     addr::{PhysAddr, PhysFrame, VirtPage},
     frame::FrameAllocator,
-    page::PageMapLevel4,
-    page::PageTable,
+    page::{IntermediatePageTable, PageMapLevel4},
+    page::{PageMapLevel1, PageTable},
 };
 
 pub struct Mappings<'a> {
@@ -21,5 +19,17 @@ impl<'a> Mappings<'a> {
         }
     }
 
-    pub fn map_page<I>(frame: PhysFrame, page: VirtPage, allocator: &mut FrameAllocator) {}
+    fn map_page_entry(frame: PhysFrame, page: VirtPage, table: &mut PageMapLevel1) {
+        let entry = table.get_entry_mut(page.base_addr());
+
+        entry.set_addr(frame.base_addr());
+    }
+
+    pub fn map_page(&mut self, frame: PhysFrame, page: VirtPage, allocator: &mut FrameAllocator) {
+        let addr = page.base_addr();
+
+        let level_3_map = self.level_4_map.get_mut_or_insert(addr, allocator);
+        let level_2_map = level_3_map.get_mut_or_insert(addr, allocator);
+        let level_1_map = level_2_map.get_mut_or_insert(addr, allocator);
+    }
 }
