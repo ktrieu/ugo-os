@@ -69,12 +69,12 @@ impl PhysFrame {
         PhysFrame(addr)
     }
 
-    pub fn frame_end_exclusive(&self, frames: u64) -> PhysFrame {
+    pub fn end_of_range_exclusive(&self, frames: u64) -> PhysFrame {
         PhysFrame::from_base_u64(self.base_addr().as_u64() + frames * PAGE_SIZE)
     }
 
     pub fn next_frame(&self) -> PhysFrame {
-        self.frame_end_exclusive(0)
+        self.end_of_range_exclusive(0)
     }
 
     pub fn from_base_u64(addr: u64) -> PhysFrame {
@@ -166,6 +166,7 @@ impl VirtAddr {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct VirtPage(VirtAddr);
 
 impl VirtPage {
@@ -183,7 +184,19 @@ impl VirtPage {
         VirtPage(addr)
     }
 
+    pub fn from_base_u64(base: u64) -> VirtPage {
+        VirtPage::from_base_addr(VirtAddr::new(base))
+    }
+
     pub fn base_addr(&self) -> VirtAddr {
         self.0
+    }
+
+    pub fn end_of_range_exclusive(&self, pages: u64) -> VirtPage {
+        VirtPage::from_base_u64(self.base_addr().as_u64() + pages * PAGE_SIZE)
+    }
+
+    pub fn next_page(&self) -> VirtPage {
+        self.end_of_range_exclusive(0)
     }
 }

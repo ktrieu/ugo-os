@@ -5,6 +5,8 @@
 use core::panic::PanicInfo;
 use core::slice;
 
+use addr::PhysFrame;
+use common::KMEM_START;
 use common::PAGE_SIZE;
 use uefi::prelude::*;
 
@@ -18,10 +20,12 @@ mod graphics;
 mod mappings;
 mod page;
 
+use uefi::table::boot::MemoryDescriptor;
 use uefi::table::boot::MemoryMapSize;
 use uefi::table::boot::MemoryType;
 
 use crate::frame::FrameAllocator;
+use crate::mappings::Mappings;
 
 fn get_memory_map_size(boot_services: &BootServices) -> usize {
     let MemoryMapSize {
@@ -102,10 +106,13 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
 
     let mut frame_allocator = FrameAllocator::new(descriptors.clone(), MIN_BOOT_PHYS_FRAMES);
     bootlog!(
-        "Reserved physical memory for boot. ({:#016x}-{:#016x}",
+        "Reserved physical memory for boot. ({:#016x}-{:#016x})",
         frame_allocator.alloc_start().as_u64(),
         frame_allocator.alloc_end().as_u64()
     );
+
+    let mut page_mappings = Mappings::new(&mut frame_allocator);
+    page_mappings.map_physical_memory(descriptors.clone(), &mut frame_allocator);
 
     loop {}
 }
