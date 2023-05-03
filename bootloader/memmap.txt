@@ -1,0 +1,22 @@
+The kernel memory map that (ideally) should be mapped into memory after the bootloader is finished:
+
+--------------------------- KMEM_START (0xFFFF_8000_0000_0000)
+
+Direct mapping of all 
+physical memory (64 TB)
+
+--------------------------- BOOTINFO_START (0xFFFF_8100_0000_0000)
+
+Random boot info: memory map,
+GOP framebuffer, other stuff
+(1 GB)
+
+--------------------------- KERNEL_START (0xFFFF_8100_0000_0000)
+
+Kernel code/data (indeterminate)
+
+---------------------------
+
+Kernel stack (4 pages?)
+
+---------------------------
