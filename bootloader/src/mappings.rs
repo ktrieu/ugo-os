@@ -12,6 +12,7 @@ fn map_page_entry(frame: PhysFrame, page: VirtPage, table: &mut PageMapLevel1) {
     let entry = table.get_entry_mut(page.base_addr());
 
     entry.set_addr(frame.base_addr());
+    entry.set_present(true);
 }
 
 pub struct Mappings<'a> {
