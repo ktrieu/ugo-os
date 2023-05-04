@@ -11,6 +11,7 @@ use crate::{
     frame::FrameAllocator,
 };
 
+#[repr(transparent)]
 pub struct PageTableEntry {
     entry: u64,
 }
@@ -181,6 +182,7 @@ pub trait IntermediatePageTable<E: PageTable>: PageTable {
     }
 }
 
+#[repr(transparent)]
 pub struct PageMapLevel4 {
     entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
 }
@@ -201,6 +203,7 @@ impl PageTable for PageMapLevel4 {
 
 impl IntermediatePageTable<PageMapLevel3> for PageMapLevel4 {}
 
+#[repr(transparent)]
 pub struct PageMapLevel3 {
     entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
 }
@@ -221,6 +224,7 @@ impl PageTable for PageMapLevel3 {
 
 impl IntermediatePageTable<PageMapLevel2> for PageMapLevel3 {}
 
+#[repr(transparent)]
 pub struct PageMapLevel2 {
     entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
 }
@@ -241,6 +245,7 @@ impl PageTable for PageMapLevel2 {
 
 impl IntermediatePageTable<PageMapLevel1> for PageMapLevel2 {}
 
+#[repr(transparent)]
 pub struct PageMapLevel1 {
     entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
 }
