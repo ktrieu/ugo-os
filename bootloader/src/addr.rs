@@ -74,7 +74,7 @@ impl PhysFrame {
     }
 
     pub fn next_frame(&self) -> PhysFrame {
-        self.end_of_range_exclusive(0)
+        self.end_of_range_exclusive(1)
     }
 
     pub fn from_base_u64(addr: u64) -> PhysFrame {
@@ -197,6 +197,6 @@ impl VirtPage {
     }
 
     pub fn next_page(&self) -> VirtPage {
-        self.end_of_range_exclusive(0)
+        self.end_of_range_exclusive(1)
     }
 }
