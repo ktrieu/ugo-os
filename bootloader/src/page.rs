@@ -145,6 +145,7 @@ pub trait IntermediatePageTable<E: PageTable>: PageTable {
         // All indexes are 9 bits, and we have a capacity of 512, so this should always succeed.
         let entry = self.get_entry_mut(addr);
         entry.set_addr(new_addr);
+        entry.set_present(true);
 
         new_table
     }
@@ -173,6 +174,7 @@ pub trait IntermediatePageTable<E: PageTable>: PageTable {
         } else {
             let (new_table, new_addr) = E::alloc_new(allocator);
             entry.set_addr(new_addr);
+            entry.set_present(true);
 
             new_table
         }
