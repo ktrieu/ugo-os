@@ -33,8 +33,10 @@ def get_kernel_path(path=""):
     return os.path.join(KERNEL_PATH, path)
 
 
-def run_cmd_in_dir(cmd, args, dir="./"):
-    p = subprocess.Popen([cmd, *args], cwd=dir)
+def run_cmd_in_dir(cmd, args, dir="./", suppress_stderr=False):
+    p = subprocess.Popen(
+        [cmd, *args], cwd=dir, stderr=subprocess.DEVNULL if suppress_stderr else None
+    )
     exit_val = p.wait()
     if exit_val != 0:
         raise RuntimeError(f"Command failed: {cmd} {' '.join(args)}")
@@ -87,7 +89,11 @@ def cmd_run():
             "none",
             "-drive",
             f"file=fat:rw:{get_bootimg_path()},format=raw",
+            "-monitor",
+            "stdio",
         ],
+        # QEMU is giving us weird warnings about UWP, so suppress them here.
+        suppress_stderr=True,
     )
 
 
