@@ -2,6 +2,7 @@
 #![no_std]
 #![feature(abi_efiapi)]
 
+use core::arch::asm;
 use core::panic::PanicInfo;
 use core::slice;
 
@@ -113,14 +114,15 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
 
     let mut page_mappings = Mappings::new(&mut frame_allocator);
     page_mappings.map_physical_memory(descriptors.clone(), &mut frame_allocator);
+    page_mappings.identity_map_fn(uefi_main as *const (), &mut frame_allocator);
 
     // Fasten your seatbelts.
-
     unsafe {
-        page_mappings.activate();
+        asm!(
+            "mov cr3, {addr}",
+            addr = in(reg) page_mappings.level_4_phys_addr().as_u64()
+        )
     }
-
-    bootlog!("Page tables activated.");
 
     loop {}
 }
