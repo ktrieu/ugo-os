@@ -114,5 +114,13 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     let mut page_mappings = Mappings::new(&mut frame_allocator);
     page_mappings.map_physical_memory(descriptors.clone(), &mut frame_allocator);
 
+    // Fasten your seatbelts.
+
+    unsafe {
+        page_mappings.activate();
+    }
+
+    bootlog!("Page tables activated.");
+
     loop {}
 }

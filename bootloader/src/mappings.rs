@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 use common::{PAGE_SIZE, PHYSMEM_START};
 use uefi::table::boot::MemoryDescriptor;
 
@@ -66,5 +68,12 @@ impl<'a> Mappings<'a> {
             frame = frame.next_frame();
             page = page.next_page();
         }
+    }
+
+    pub unsafe fn activate(&self) {
+        asm!(
+            "mov cr3, {addr}",
+            addr = in(reg) self.level_4_phys_addr.as_u64()
+        );
     }
 }
