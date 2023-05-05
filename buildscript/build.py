@@ -10,10 +10,20 @@ KERNEL_PATH = "kernel/"
 
 # Support functions to make the actual commands more declarative:
 def copy_file(src_path, dst_path):
+    # Handle cases where the destination folders don't exist.
+    dirname = os.path.dirname(dst_path)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+
     shutil.copyfile(src_path, dst_path)
 
 
 def copy_if_newer(src_path, dst_path):
+    # If the destination doesn't exist, we definitely need to copy.
+    if not os.path.exists(dst_path):
+        copy_file(src_path, dst_path)
+
+    # Otherwise, check modification times so we only copy when needed.
     src_mtime = os.path.getmtime(src_path)
     dst_mtime = os.path.getmtime(dst_path)
 
