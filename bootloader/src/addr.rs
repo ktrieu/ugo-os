@@ -129,24 +129,22 @@ impl VirtAddr {
     }
 
     pub fn get_page_table_idx(&self) -> u64 {
-        self.0 & VirtAddr::PAGE_TABLE_IDX_MASK >> VirtAddr::PAGE_OFFSET_SIZE
+        (self.0 & VirtAddr::PAGE_TABLE_IDX_MASK) >> VirtAddr::PAGE_OFFSET_SIZE
     }
 
     pub fn get_page_dir_idx(&self) -> u64 {
-        self.0
-            & VirtAddr::PAGE_DIR_IDX_MASK >> VirtAddr::ENTRY_IDX_SIZE + VirtAddr::PAGE_OFFSET_SIZE
+        (self.0 & VirtAddr::PAGE_DIR_IDX_MASK)
+            >> VirtAddr::ENTRY_IDX_SIZE + VirtAddr::PAGE_OFFSET_SIZE
     }
 
     pub fn get_page_dir_ptr_idx(&self) -> u64 {
-        self.0
-            & VirtAddr::PAGE_DIR_PTR_IDX_MASK
-                >> VirtAddr::ENTRY_IDX_SIZE * 2 + VirtAddr::PAGE_OFFSET_SIZE
+        (self.0 & VirtAddr::PAGE_DIR_PTR_IDX_MASK)
+            >> VirtAddr::ENTRY_IDX_SIZE * 2 + VirtAddr::PAGE_OFFSET_SIZE
     }
 
     pub fn get_page_map_l4_idx(&self) -> u64 {
-        self.0
-            & VirtAddr::PAGE_MAP_L4_IDX_MASK
-                >> VirtAddr::ENTRY_IDX_SIZE * 3 + VirtAddr::PAGE_OFFSET_SIZE
+        (self.0 & VirtAddr::PAGE_MAP_L4_IDX_MASK)
+            >> VirtAddr::ENTRY_IDX_SIZE * 3 + VirtAddr::PAGE_OFFSET_SIZE
     }
 
     pub fn as_u64(&self) -> u64 {
@@ -198,5 +196,9 @@ impl VirtPage {
 
     pub fn next_page(&self) -> VirtPage {
         self.end_of_range_exclusive(1)
+    }
+
+    pub(crate) fn from_containing_u64(containing: u64) -> VirtPage {
+        VirtPage::from_containing_addr(VirtAddr::new(containing))
     }
 }
