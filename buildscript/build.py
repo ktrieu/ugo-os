@@ -101,6 +101,11 @@ def cmd_run():
             f"file=fat:rw:{get_bootimg_path()},format=raw",
             "-monitor",
             "stdio",
+            "-D",
+            "qemu.log",
+            "-d",
+            "int",
+            "-no-reboot"
         ],
         # QEMU is giving us weird warnings about UWP, so suppress them here.
         suppress_stderr=True,

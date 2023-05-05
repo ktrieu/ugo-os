@@ -8,3 +8,6 @@ ovmf/
 
 # This is the directory where we build the image that QEMU will boot
 bootimg/
+
+# The file we send QEMU logs to
+qemu.log
