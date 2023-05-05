@@ -105,7 +105,9 @@ def cmd_run():
             "qemu.log",
             "-d",
             "int",
-            "-no-reboot"
+            "-no-reboot",
+            "-action",
+            "shutdown=pause"
         ],
         # QEMU is giving us weird warnings about UWP, so suppress them here.
         suppress_stderr=True,
