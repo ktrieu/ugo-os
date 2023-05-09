@@ -1,6 +1,5 @@
 #![no_main]
 #![no_std]
-#![feature(abi_efiapi)]
 
 use core::arch::asm;
 use core::panic::PanicInfo;
@@ -21,23 +20,10 @@ mod graphics;
 mod mappings;
 mod page;
 
-use uefi::table::boot::MemoryDescriptor;
-use uefi::table::boot::MemoryMapSize;
 use uefi::table::boot::MemoryType;
 
 use crate::frame::FrameAllocator;
 use crate::mappings::Mappings;
-
-fn get_memory_map_size(boot_services: &BootServices) -> usize {
-    let MemoryMapSize {
-        entry_size,
-        mut map_size,
-    } = boot_services.memory_map_size();
-    // Allocating memory might add a few descriptors, so just to be safe, reserve a few more
-    map_size += 2;
-
-    entry_size * map_size
-}
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -79,22 +65,11 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
         &file_data[0..4]
     );
 
-    let mem_map_buffer_size = get_memory_map_size(system_table.boot_services());
-    let mem_map_buffer = unsafe {
-        let raw_buffer = system_table
-            .boot_services()
-            .allocate_pool(MemoryType::LOADER_DATA, mem_map_buffer_size)
-            .expect("Could not allocate space for memory map.");
-        slice::from_raw_parts_mut(raw_buffer, mem_map_buffer_size)
-    };
-
-    let (_, descriptors) = system_table
-        .exit_boot_services(handle, mem_map_buffer)
-        .expect("Could not exit boot services.");
+    let (_, memory_map) = system_table.exit_boot_services();
 
     // DEBUG: Print memory map
-    for d in descriptors
-        .clone()
+    for d in memory_map
+        .entries()
         .filter(|d| d.ty == MemoryType::CONVENTIONAL)
     {
         bootlog!(
@@ -105,7 +80,7 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
         )
     }
 
-    let mut frame_allocator = FrameAllocator::new(descriptors.clone(), MIN_BOOT_PHYS_FRAMES);
+    let mut frame_allocator = FrameAllocator::new(&memory_map, MIN_BOOT_PHYS_FRAMES);
     bootlog!(
         "Reserved physical memory for boot. ({:#016x}-{:#016x})",
         frame_allocator.alloc_start().as_u64(),
@@ -113,7 +88,7 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     );
 
     let mut page_mappings = Mappings::new(&mut frame_allocator);
-    page_mappings.map_physical_memory(descriptors.clone(), &mut frame_allocator);
+    page_mappings.map_physical_memory(&memory_map, &mut frame_allocator);
     page_mappings.identity_map_fn(uefi_main as *const (), &mut frame_allocator);
 
     // Fasten your seatbelts.

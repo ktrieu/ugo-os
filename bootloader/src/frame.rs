@@ -1,4 +1,4 @@
-use uefi::table::boot::{MemoryDescriptor, MemoryType};
+use uefi::table::boot::{MemoryDescriptor, MemoryMap, MemoryType};
 
 use crate::addr::{PhysAddr, PhysFrame};
 
@@ -12,13 +12,10 @@ pub struct FrameAllocator {
 }
 
 impl FrameAllocator {
-    pub fn new<'a, I: ExactSizeIterator<Item = &'a MemoryDescriptor> + Clone>(
-        descriptors: I,
-        min_frames: u64,
-    ) -> Self {
+    pub fn new(memory_map: &MemoryMap, min_frames: u64) -> Self {
         // Find the first free descriptor big enough
-        let mut descriptors = descriptors.clone();
-        let first_free = descriptors
+        let first_free = memory_map
+            .entries()
             .find(|descriptor| {
                 descriptor.ty == MemoryType::CONVENTIONAL && descriptor.page_count >= min_frames
             })

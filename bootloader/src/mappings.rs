@@ -1,7 +1,7 @@
 use core::arch::asm;
 
 use common::{PAGE_SIZE, PHYSMEM_START};
-use uefi::table::boot::MemoryDescriptor;
+use uefi::table::boot::{MemoryDescriptor, MemoryMap};
 
 use crate::{
     addr::{PhysAddr, PhysFrame, VirtAddr, VirtPage},
@@ -68,11 +68,9 @@ impl<'a> Mappings<'a> {
         map_page_entry(frame, page, level_1_map, ty);
     }
 
-    pub fn map_physical_memory<'b, D>(&mut self, descriptors: D, allocator: &mut FrameAllocator)
-    where
-        D: ExactSizeIterator<Item = &'b MemoryDescriptor> + Clone,
-    {
-        let highest_segment = descriptors
+    pub fn map_physical_memory(&mut self, memory_map: &MemoryMap, allocator: &mut FrameAllocator) {
+        let highest_segment = memory_map
+            .entries()
             .max_by_key(|descriptor| descriptor.phys_start)
             .expect("Memory map was empty!");
 
