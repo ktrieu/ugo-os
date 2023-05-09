@@ -1,4 +1,4 @@
-use uefi::table::boot::{MemoryDescriptor, MemoryMap, MemoryType};
+use uefi::table::boot::{MemoryMap, MemoryType};
 
 use crate::addr::{PhysAddr, PhysFrame};
 

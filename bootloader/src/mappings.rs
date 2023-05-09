@@ -1,7 +1,7 @@
 use core::arch::asm;
 
-use common::{PAGE_SIZE, PHYSMEM_START};
-use uefi::table::boot::{MemoryDescriptor, MemoryMap};
+use common::PHYSMEM_START;
+use uefi::table::boot::MemoryMap;
 
 use crate::{
     addr::{PhysAddr, PhysFrame, VirtAddr, VirtPage},

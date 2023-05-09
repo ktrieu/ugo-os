@@ -3,10 +3,7 @@
 
 use core::arch::asm;
 use core::panic::PanicInfo;
-use core::slice;
 
-use addr::PhysFrame;
-use common::KMEM_START;
 use common::PAGE_SIZE;
 use uefi::prelude::*;
 
