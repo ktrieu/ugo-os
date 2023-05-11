@@ -76,7 +76,7 @@ impl<'a> Mappings<'a> {
             .expect("Memory map was empty!");
 
         let end_frame = PhysFrame::from_base_u64(highest_segment.phys_start)
-            .end_of_range_exclusive(highest_segment.page_count);
+            .add_frames(highest_segment.page_count);
 
         bootlog!(
             "Mapping all physical memory.\nP: {:#016x} - {:#016x}\nV: {:#016x} - {:#016x}",

@@ -23,8 +23,7 @@ impl FrameAllocator {
 
         FrameAllocator {
             alloc_start: PhysFrame::from_base_u64(first_free.phys_start),
-            alloc_end: PhysFrame::from_base_u64(first_free.phys_start)
-                .end_of_range_exclusive(min_frames),
+            alloc_end: PhysFrame::from_base_u64(first_free.phys_start).add_frames(min_frames),
             next_frame: PhysFrame::from_base_u64(first_free.phys_start),
         }
     }

@@ -50,6 +50,44 @@ impl PhysAddr {
     }
 }
 
+pub struct FrameIterExclusive {
+    curr: PhysFrame,
+    end: PhysFrame,
+}
+
+impl Iterator for FrameIterExclusive {
+    type Item = PhysFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ret = self.curr;
+        if ret.base_addr() > self.end.base_addr() {
+            None
+        } else {
+            self.curr = ret.next_frame();
+            Some(ret)
+        }
+    }
+}
+
+pub struct FrameIterInclusive {
+    curr: PhysFrame,
+    end: PhysFrame,
+}
+
+impl Iterator for FrameIterInclusive {
+    type Item = PhysFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ret = self.curr;
+        if ret.base_addr() >= self.end.base_addr() {
+            None
+        } else {
+            self.curr = ret.next_frame();
+            Some(ret)
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct PhysFrame(PhysAddr);
 
@@ -69,12 +107,20 @@ impl PhysFrame {
         PhysFrame(addr)
     }
 
-    pub fn end_of_range_exclusive(&self, frames: u64) -> PhysFrame {
+    pub fn add_frames(&self, frames: u64) -> PhysFrame {
         PhysFrame::from_base_u64(self.base_addr().as_u64() + frames * PAGE_SIZE)
     }
 
     pub fn next_frame(&self) -> PhysFrame {
-        self.end_of_range_exclusive(1)
+        self.add_frames(1)
+    }
+
+    pub fn range_inclusive(&self, end: PhysFrame) -> FrameIterInclusive {
+        FrameIterInclusive { curr: *self, end }
+    }
+
+    pub fn range_exclusive(&self, end: PhysFrame) -> FrameIterExclusive {
+        FrameIterExclusive { curr: *self, end }
     }
 
     pub fn from_base_u64(addr: u64) -> PhysFrame {
@@ -164,6 +210,44 @@ impl VirtAddr {
     }
 }
 
+pub struct PageIterExclusive {
+    curr: VirtPage,
+    end: VirtPage,
+}
+
+impl Iterator for PageIterExclusive {
+    type Item = VirtPage;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ret = self.curr;
+        if ret.base_addr() > self.end.base_addr() {
+            None
+        } else {
+            self.curr = ret.next_page();
+            Some(ret)
+        }
+    }
+}
+
+pub struct PageIterInclusive {
+    curr: VirtPage,
+    end: VirtPage,
+}
+
+impl Iterator for PageIterInclusive {
+    type Item = VirtPage;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ret = self.curr;
+        if ret.base_addr() >= self.end.base_addr() {
+            None
+        } else {
+            self.curr = ret.next_page();
+            Some(ret)
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct VirtPage(VirtAddr);
 
@@ -190,15 +274,23 @@ impl VirtPage {
         self.0
     }
 
-    pub fn end_of_range_exclusive(&self, pages: u64) -> VirtPage {
+    pub fn add_pages(&self, pages: u64) -> VirtPage {
         VirtPage::from_base_u64(self.base_addr().as_u64() + pages * PAGE_SIZE)
     }
 
     pub fn next_page(&self) -> VirtPage {
-        self.end_of_range_exclusive(1)
+        self.add_pages(1)
     }
 
-    pub(crate) fn from_containing_u64(containing: u64) -> VirtPage {
+    pub fn range_inclusive(&self, end: VirtPage) -> PageIterInclusive {
+        PageIterInclusive { curr: *self, end }
+    }
+
+    pub fn range_exclusive(&self, end: VirtPage) -> PageIterExclusive {
+        PageIterExclusive { curr: *self, end }
+    }
+
+    pub fn from_containing_u64(containing: u64) -> VirtPage {
         VirtPage::from_containing_addr(VirtAddr::new(containing))
     }
 }
