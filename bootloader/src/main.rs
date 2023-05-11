@@ -4,7 +4,9 @@
 use core::arch::asm;
 use core::panic::PanicInfo;
 
+use addr::VirtAddr;
 use common::PAGE_SIZE;
+use loader::LoaderResult;
 use uefi::prelude::*;
 
 #[macro_use]
@@ -14,6 +16,7 @@ mod addr;
 mod frame;
 mod fs;
 mod graphics;
+mod loader;
 mod mappings;
 mod page;
 
@@ -21,6 +24,7 @@ use uefi::table::boot::MemoryType;
 use xmas_elf::ElfFile;
 
 use crate::frame::FrameAllocator;
+use crate::loader::Loader;
 use crate::mappings::Mappings;
 
 #[panic_handler]
@@ -44,6 +48,12 @@ fn read_kernel_file(boot_services: &BootServices) -> &'static [u8] {
         fs::open_kernel_file(&mut root_volume).expect("Failed to open kernel file.");
 
     fs::read_file_data(boot_services, &mut kernel_file).expect("Failed to read kernel file.")
+}
+
+fn load_kernel(mappings: &mut Mappings, kernel_data: &[u8]) -> LoaderResult<VirtAddr> {
+    let loader = Loader::new(kernel_data)?;
+
+    loader.load_kernel(mappings)
 }
 
 // We grab at least 256 frames (1 GB) of physical memory for boot purposes
@@ -89,15 +99,14 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     page_mappings.map_physical_memory(&memory_map, &mut frame_allocator);
     page_mappings.identity_map_fn(uefi_main as *const (), &mut frame_allocator);
 
-    let elf_file = match ElfFile::new(file_data) {
-        Ok(elf_file) => elf_file,
-        Err(error_str) => {
-            bootlog!("Error parsing ELF file: {}", error_str);
-            panic!();
+    let virt_entrypoint = match load_kernel(&mut page_mappings, file_data) {
+        Ok(loader) => loader,
+        Err(err) => {
+            panic!("Kernel load error: {}", err)
         }
     };
 
-    page_mappings.map_kernel(&elf_file);
+    bootlog!("Kernel entrypoint: {:#016x}", virt_entrypoint.as_u64());
 
     // Fasten your seatbelts.
     unsafe {

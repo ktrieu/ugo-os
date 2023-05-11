@@ -1,8 +1,7 @@
 use core::arch::asm;
 
-use common::PHYSMEM_START;
+use common::{KERNEL_START, PHYSMEM_START};
 use uefi::table::boot::MemoryMap;
-use xmas_elf::ElfFile;
 
 use crate::{
     addr::{PhysAddr, PhysFrame, VirtAddr, VirtPage},
@@ -38,6 +37,14 @@ fn map_page_entry(frame: PhysFrame, page: VirtPage, table: &mut PageMapLevel1, t
         }
     }
 }
+
+// Ensure any kernel segment we attempt to map is in the higher half.
+// This catches improper base address specification for the kernel.
+fn is_valid_kernel_addr(addr: u64) -> bool {
+    addr >= KERNEL_START
+}
+
+type ElfResult<T> = Result<T, &'static str>;
 
 pub struct Mappings<'a> {
     level_4_map: &'a mut PageMapLevel4,
@@ -118,12 +125,6 @@ impl<'a> Mappings<'a> {
             allocator,
             MappingType::Code,
         )
-    }
-
-    pub fn map_kernel(&mut self, elf_file: &ElfFile) {
-        for header in elf_file.program_iter() {
-            bootlog!("{}", header);
-        }
     }
 
     pub unsafe fn activate(&self) {
