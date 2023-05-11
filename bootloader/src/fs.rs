@@ -1,5 +1,6 @@
 use core::slice;
 
+use common::PAGE_SIZE;
 use uefi::{
     prelude::{cstr16, BootServices},
     proto::media::{
@@ -61,9 +62,11 @@ pub fn read_file_data(
         .try_into()
         .expect("Kernel file larger than usize!");
 
-    let file_buf =
-        boot_services.allocate_pages(AllocateType::AnyPages, MemoryType::LOADER_DATA, file_size)?
-            as *mut u8;
+    let file_buf = boot_services.allocate_pages(
+        AllocateType::AnyPages,
+        MemoryType::LOADER_DATA,
+        (file_size / PAGE_SIZE as usize) + 1,
+    )? as *mut u8;
 
     // Weird: the error case for this isn't a uefi::Error, only an Option<usize>. Since we've already done
     // the file size checking earlier, we assume this always succeeds.
