@@ -4,7 +4,7 @@ use common::{KERNEL_START, PHYSMEM_START};
 use uefi::table::boot::MemoryMap;
 
 use crate::{
-    addr::{PhysAddr, PhysFrame, VirtAddr, VirtPage},
+    addr::{PhysAddr, PhysFrame, VirtPage},
     frame::FrameAllocator,
     page::{IntermediatePageTable, PageMapLevel4, PageTableEntry},
     page::{PageMapLevel1, PageTable},
@@ -60,14 +60,6 @@ fn map_page_entry(
 
     flags.set_for_entry(entry);
 }
-
-// Ensure any kernel segment we attempt to map is in the higher half.
-// This catches improper base address specification for the kernel.
-fn is_valid_kernel_addr(addr: u64) -> bool {
-    addr >= KERNEL_START
-}
-
-type ElfResult<T> = Result<T, &'static str>;
 
 pub struct Mappings<'a> {
     level_4_map: &'a mut PageMapLevel4,

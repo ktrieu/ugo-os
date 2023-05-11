@@ -115,8 +115,10 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     // Fasten your seatbelts.
     unsafe {
         asm!(
-            "mov cr3, {addr}",
-            addr = in(reg) page_mappings.level_4_phys_addr().as_u64()
+            "mov cr3, {addr}
+            jmp {entry}",
+            addr = in(reg) page_mappings.level_4_phys_addr().as_u64(),
+            entry = in(reg) virt_entrypoint.as_u64()
         )
     }
 

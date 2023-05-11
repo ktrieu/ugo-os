@@ -54,6 +54,14 @@ impl PhysAddr {
     pub fn as_u64(self) -> u64 {
         self.0
     }
+
+    pub fn as_u8_ptr(&self) -> *const u8 {
+        self.0 as *const u8
+    }
+
+    pub fn as_u8_ptr_mut(&self) -> *mut u8 {
+        self.0 as *mut u8
+    }
 }
 
 impl Display for PhysAddr {
@@ -150,6 +158,14 @@ impl PhysFrame {
     pub fn to_virt_page(&self, offset: u64) -> VirtPage {
         assert!(is_aligned(offset, PAGE_SIZE));
         VirtPage::from_base_u64(self.0.as_u64() + offset)
+    }
+
+    pub fn as_u8_ptr(&self) -> *const u8 {
+        self.0.as_u8_ptr()
+    }
+
+    pub fn as_u8_ptr_mut(&self) -> *mut u8 {
+        self.0.as_u8_ptr_mut()
     }
 }
 
