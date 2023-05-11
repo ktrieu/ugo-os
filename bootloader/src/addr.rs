@@ -2,7 +2,7 @@ use core::fmt::Display;
 
 use common::{PAGE_SIZE, PHYSADDR_SIZE, VIRTADDR_SIZE};
 
-fn align_down(addr: u64, align: u64) -> u64 {
+pub fn align_down(addr: u64, align: u64) -> u64 {
     if !align.is_power_of_two() {
         panic!("Cannot align to non power of two alignment {align}!")
     }
@@ -10,11 +10,15 @@ fn align_down(addr: u64, align: u64) -> u64 {
     addr & !(align - 1)
 }
 
-fn align_up(addr: u64, align: u64) -> u64 {
-    align_down(addr, align) + align
+pub fn align_up(addr: u64, align: u64) -> u64 {
+    if is_aligned(addr, align) {
+        addr
+    } else {
+        align_down(addr, align) + align
+    }
 }
 
-fn is_aligned(addr: u64, align: u64) -> bool {
+pub fn is_aligned(addr: u64, align: u64) -> bool {
     align_down(addr, align) == addr
 }
 

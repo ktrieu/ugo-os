@@ -4,7 +4,7 @@ use common::{KERNEL_START, PAGE_SIZE};
 use xmas_elf::program::{ProgramHeader, Type as ProgramHeaderType};
 use xmas_elf::ElfFile;
 
-use crate::addr::{PhysFrame, VirtPage};
+use crate::addr::{align_up, PhysFrame, VirtPage};
 use crate::frame::FrameAllocator;
 use crate::mappings::MappingFlags;
 use crate::{
@@ -70,7 +70,7 @@ impl<'a> Loader<'a> {
         allocator: &mut FrameAllocator,
     ) -> LoaderResult<()> {
         let vaddr = VirtAddr::new(phdr.virtual_addr());
-        let num_file_pages = phdr.file_size() / PAGE_SIZE;
+        let num_file_pages = align_up(phdr.file_size(), PAGE_SIZE) / PAGE_SIZE;
 
         if !is_valid_kernel_addr(vaddr) {
             return Err(LoaderError::InvalidKernelSegmentAddress(vaddr));
