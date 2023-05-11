@@ -2,6 +2,7 @@ use core::arch::asm;
 
 use common::PHYSMEM_START;
 use uefi::table::boot::MemoryMap;
+use xmas_elf::ElfFile;
 
 use crate::{
     addr::{PhysAddr, PhysFrame, VirtAddr, VirtPage},
@@ -117,6 +118,12 @@ impl<'a> Mappings<'a> {
             allocator,
             MappingType::Code,
         )
+    }
+
+    pub fn map_kernel(&mut self, elf_file: &ElfFile) {
+        for header in elf_file.program_iter() {
+            bootlog!("{}", header);
+        }
     }
 
     pub unsafe fn activate(&self) {

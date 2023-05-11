@@ -89,6 +89,15 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     page_mappings.map_physical_memory(&memory_map, &mut frame_allocator);
     page_mappings.identity_map_fn(uefi_main as *const (), &mut frame_allocator);
 
+    let elf_file = match ElfFile::new(file_data) {
+        Ok(elf_file) => elf_file,
+        Err(error_str) => {
+            bootlog!("Error parsing ELF file: {}", error_str);
+            panic!();
+        }
+    };
+
+    page_mappings.map_kernel(&elf_file);
 
     // Fasten your seatbelts.
     unsafe {
