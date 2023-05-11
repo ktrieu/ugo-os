@@ -50,10 +50,14 @@ fn read_kernel_file(boot_services: &BootServices) -> &'static [u8] {
     fs::read_file_data(boot_services, &mut kernel_file).expect("Failed to read kernel file.")
 }
 
-fn load_kernel(mappings: &mut Mappings, kernel_data: &[u8]) -> LoaderResult<VirtAddr> {
+fn load_kernel(
+    mappings: &mut Mappings,
+    allocator: &mut FrameAllocator,
+    kernel_data: &[u8],
+) -> LoaderResult<VirtAddr> {
     let loader = Loader::new(kernel_data)?;
 
-    loader.load_kernel(mappings)
+    loader.load_kernel(mappings, allocator)
 }
 
 // We grab at least 256 frames (1 GB) of physical memory for boot purposes
@@ -99,7 +103,7 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     page_mappings.map_physical_memory(&memory_map, &mut frame_allocator);
     page_mappings.identity_map_fn(uefi_main as *const (), &mut frame_allocator);
 
-    let virt_entrypoint = match load_kernel(&mut page_mappings, file_data) {
+    let virt_entrypoint = match load_kernel(&mut page_mappings, &mut frame_allocator, file_data) {
         Ok(loader) => loader,
         Err(err) => {
             panic!("Kernel load error: {}", err)

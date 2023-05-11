@@ -6,36 +6,59 @@ use uefi::table::boot::MemoryMap;
 use crate::{
     addr::{PhysAddr, PhysFrame, VirtAddr, VirtPage},
     frame::FrameAllocator,
-    page::{IntermediatePageTable, PageMapLevel4},
+    page::{IntermediatePageTable, PageMapLevel4, PageTableEntry},
     page::{PageMapLevel1, PageTable},
 };
 
-pub enum MappingType {
-    Code,
-    ReadData,
-    ReadWriteData,
+pub struct MappingFlags {
+    exec: bool,
+    write: bool,
 }
 
-fn map_page_entry(frame: PhysFrame, page: VirtPage, table: &mut PageMapLevel1, ty: MappingType) {
+impl MappingFlags {
+    pub fn set_for_entry(&self, entry: &mut PageTableEntry) {
+        entry.set_no_exec(!self.exec);
+        entry.set_write(self.write);
+    }
+
+    pub fn new(exec: bool, write: bool) -> MappingFlags {
+        MappingFlags { exec, write }
+    }
+
+    pub fn new_rw_data() -> MappingFlags {
+        MappingFlags {
+            exec: false,
+            write: true,
+        }
+    }
+
+    pub fn new_r_data() -> MappingFlags {
+        MappingFlags {
+            exec: false,
+            write: false,
+        }
+    }
+
+    pub fn new_code() -> MappingFlags {
+        MappingFlags {
+            exec: true,
+            write: false,
+        }
+    }
+}
+
+fn map_page_entry(
+    frame: PhysFrame,
+    page: VirtPage,
+    table: &mut PageMapLevel1,
+    flags: MappingFlags,
+) {
     let entry = table.get_entry_mut(page.base_addr());
 
     entry.set_addr(frame.base_addr());
     entry.set_present(true);
 
-    match ty {
-        MappingType::Code => {
-            entry.set_no_exec(false);
-            entry.set_write(false);
-        }
-        MappingType::ReadData => {
-            entry.set_no_exec(true);
-            entry.set_write(false);
-        }
-        MappingType::ReadWriteData => {
-            entry.set_no_exec(true);
-            entry.set_write(true);
-        }
-    }
+    flags.set_for_entry(entry);
 }
 
 // Ensure any kernel segment we attempt to map is in the higher half.
@@ -65,7 +88,7 @@ impl<'a> Mappings<'a> {
         frame: PhysFrame,
         page: VirtPage,
         allocator: &mut FrameAllocator,
-        ty: MappingType,
+        flags: MappingFlags,
     ) {
         let addr = page.base_addr();
 
@@ -73,7 +96,7 @@ impl<'a> Mappings<'a> {
         let level_2_map = level_3_map.get_mut_or_insert(addr, allocator);
         let level_1_map = level_2_map.get_mut_or_insert(addr, allocator);
 
-        map_page_entry(frame, page, level_1_map, ty);
+        map_page_entry(frame, page, level_1_map, flags);
     }
 
     pub fn map_physical_memory(&mut self, memory_map: &MemoryMap, allocator: &mut FrameAllocator) {
@@ -101,7 +124,7 @@ impl<'a> Mappings<'a> {
         let page_range = start_page.range_inclusive(end_page);
 
         for (frame, page) in frame_range.zip(page_range) {
-            self.map_page(frame, page, allocator, MappingType::ReadWriteData);
+            self.map_page(frame, page, allocator, MappingFlags::new_rw_data());
         }
     }
 
@@ -115,14 +138,14 @@ impl<'a> Mappings<'a> {
 
         bootlog!("Identity mapping {}", frame);
 
-        self.map_page(frame, page, allocator, MappingType::Code);
+        self.map_page(frame, page, allocator, MappingFlags::new_code());
         // The function might lie on a page boundary, so map the next one too.
         bootlog!("Identity mapping {}", frame.next_frame());
         self.map_page(
             frame.next_frame(),
             page.next_page(),
             allocator,
-            MappingType::Code,
+            MappingFlags::new_code(),
         )
     }
 
