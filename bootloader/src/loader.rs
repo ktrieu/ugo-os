@@ -23,7 +23,7 @@ impl Display for LoaderError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             LoaderError::InvalidKernelSegmentAddress(vaddr) => {
-                write!(f, "Invalid kernel segment address {:#016x}", vaddr.as_u64())
+                write!(f, "Invalid kernel segment address {}", vaddr)
             }
             LoaderError::ElfFileError(elf_error) => write!(f, "ELF file read error: {}", elf_error),
         }

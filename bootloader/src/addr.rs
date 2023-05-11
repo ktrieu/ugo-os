@@ -1,3 +1,5 @@
+use core::fmt::Display;
+
 use common::{PAGE_SIZE, PHYSADDR_SIZE, VIRTADDR_SIZE};
 
 fn align_down(addr: u64, align: u64) -> u64 {
@@ -47,6 +49,12 @@ impl PhysAddr {
 
     pub fn as_u64(self) -> u64 {
         self.0
+    }
+}
+
+impl Display for PhysAddr {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "0x{:016x}", self.0)
     }
 }
 
@@ -134,6 +142,17 @@ impl PhysFrame {
     pub fn base_addr(&self) -> PhysAddr {
         self.0
     }
+
+    pub fn to_virt_page(&self, offset: u64) -> VirtPage {
+        assert!(is_aligned(offset, PAGE_SIZE));
+        VirtPage::from_base_u64(self.0.as_u64() + offset)
+    }
+}
+
+impl Display for PhysFrame {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Frame: {}", self.0)
+    }
 }
 
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
@@ -207,6 +226,12 @@ impl VirtAddr {
 
     pub fn is_aligned(&self, align: u64) -> bool {
         is_aligned(self.0, align)
+    }
+}
+
+impl Display for VirtAddr {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "0x{:016x}", self.0)
     }
 }
 
@@ -292,5 +317,13 @@ impl VirtPage {
 
     pub fn from_containing_u64(containing: u64) -> VirtPage {
         VirtPage::from_containing_addr(VirtAddr::new(containing))
+    }
+}
+
+impl Display for VirtPage {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // Add a second space here so the address is aligned with the Frame Display impl. I'm sure we'll be
+        // comparing these two often.
+        write!(f, "Page:  {}", self.0)
     }
 }

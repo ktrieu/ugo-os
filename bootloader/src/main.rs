@@ -90,9 +90,9 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
 
     let mut frame_allocator = FrameAllocator::new(&memory_map, MIN_BOOT_PHYS_FRAMES);
     bootlog!(
-        "Reserved physical memory for boot. ({:#016x}-{:#016x})",
-        frame_allocator.alloc_start().as_u64(),
-        frame_allocator.alloc_end().as_u64()
+        "Reserved physical memory for boot. ({}-{})",
+        frame_allocator.alloc_start(),
+        frame_allocator.alloc_end()
     );
 
     let mut page_mappings = Mappings::new(&mut frame_allocator);
@@ -106,7 +106,7 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
         }
     };
 
-    bootlog!("Kernel entrypoint: {:#016x}", virt_entrypoint.as_u64());
+    bootlog!("Kernel entrypoint: {}", virt_entrypoint);
 
     // Fasten your seatbelts.
     unsafe {

@@ -82,24 +82,26 @@ impl<'a> Mappings<'a> {
             .max_by_key(|descriptor| descriptor.phys_start)
             .expect("Memory map was empty!");
 
+        let start_frame = PhysFrame::from_base_u64(0);
         let end_frame = PhysFrame::from_base_u64(highest_segment.phys_start)
             .add_frames(highest_segment.page_count);
 
+        let start_page = start_frame.to_virt_page(PHYSMEM_START);
+        let end_page = end_frame.to_virt_page(PHYSMEM_START);
+
         bootlog!(
-            "Mapping all physical memory.\nP: {:#016x} - {:#016x}\nV: {:#016x} - {:#016x}",
-            0,
-            end_frame.base_addr().as_u64(),
-            PHYSMEM_START,
-            PHYSMEM_START + end_frame.base_addr().as_u64()
+            "Mapping all physical memory.\n{} - {}\n{} - {}",
+            start_frame,
+            end_frame,
+            start_page,
+            end_page
         );
 
-        let mut frame = PhysFrame::from_base_u64(0);
-        let mut page = VirtPage::from_base_addr(VirtAddr::new(PHYSMEM_START));
+        let frame_range = start_frame.range_inclusive(end_frame);
+        let page_range = start_page.range_inclusive(end_page);
 
-        while frame.base_addr() < end_frame.base_addr() {
+        for (frame, page) in frame_range.zip(page_range) {
             self.map_page(frame, page, allocator, MappingType::ReadWriteData);
-            frame = frame.next_frame();
-            page = page.next_page();
         }
     }
 
@@ -111,14 +113,11 @@ impl<'a> Mappings<'a> {
         let frame = PhysFrame::from_containing_u64(addr);
         let page = VirtPage::from_containing_u64(addr);
 
-        bootlog!("Identity mapping {:#016x}", frame.base_addr().as_u64());
+        bootlog!("Identity mapping {}", frame);
 
         self.map_page(frame, page, allocator, MappingType::Code);
         // The function might lie on a page boundary, so map the next one too.
-        bootlog!(
-            "Identity mapping {:016x}",
-            frame.next_frame().base_addr().as_u64()
-        );
+        bootlog!("Identity mapping {}", frame.next_frame());
         self.map_page(
             frame.next_frame(),
             page.next_page(),
