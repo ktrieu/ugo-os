@@ -19,6 +19,7 @@ pub struct Loader<'a> {
 
 pub enum LoaderError {
     InvalidKernelSegmentAddress(VirtAddr),
+    ImproperAlignment(u64),
     ElfFileError(&'static str),
 }
 
@@ -27,6 +28,9 @@ impl Display for LoaderError {
         match self {
             LoaderError::InvalidKernelSegmentAddress(vaddr) => {
                 write!(f, "Invalid kernel segment address {}", vaddr)
+            }
+            LoaderError::ImproperAlignment(align) => {
+                write!(f, "Improperly aligned segment (aligned {})", align)
             }
             LoaderError::ElfFileError(elf_error) => write!(f, "ELF file read error: {}", elf_error),
         }
@@ -74,6 +78,10 @@ impl<'a> Loader<'a> {
 
         if !is_valid_kernel_addr(vaddr) {
             return Err(LoaderError::InvalidKernelSegmentAddress(vaddr));
+        }
+
+        if phdr.align() != PAGE_SIZE {
+            return Err(LoaderError::ImproperAlignment(phdr.align()));
         }
 
         let start_frame =
