@@ -18,6 +18,7 @@ mod mappings;
 mod page;
 
 use uefi::table::boot::MemoryType;
+use xmas_elf::ElfFile;
 
 use crate::frame::FrameAllocator;
 use crate::mappings::Mappings;
@@ -35,7 +36,7 @@ fn init_logger(boot_services: &BootServices) {
     logger::logger_init(&mut gop);
 }
 
-fn read_kernel_file(boot_services: &BootServices) -> &[u8] {
+fn read_kernel_file(boot_services: &BootServices) -> &'static [u8] {
     let mut sfs = fs::locate_sfs(boot_services).expect("Failed to locate filesystem protocol.");
 
     let mut root_volume = fs::open_root_volume(&mut sfs).expect("Failed to open root volume.");
@@ -87,6 +88,7 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     let mut page_mappings = Mappings::new(&mut frame_allocator);
     page_mappings.map_physical_memory(&memory_map, &mut frame_allocator);
     page_mappings.identity_map_fn(uefi_main as *const (), &mut frame_allocator);
+
 
     // Fasten your seatbelts.
     unsafe {

@@ -53,10 +53,10 @@ fn get_file_size(boot_services: &BootServices, file: &mut RegularFile) -> Result
     return file_size;
 }
 
-pub fn read_file_data<'a, 'b>(
-    boot_services: &'a BootServices,
-    file: &'b mut RegularFile,
-) -> Result<&'a [u8], uefi::Error> {
+pub fn read_file_data(
+    boot_services: &BootServices,
+    file: &mut RegularFile,
+) -> Result<&'static [u8], uefi::Error> {
     let file_size: usize = get_file_size(boot_services, file)?
         .try_into()
         .expect("Kernel file larger than usize!");
