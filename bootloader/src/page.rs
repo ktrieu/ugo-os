@@ -147,6 +147,9 @@ pub trait IntermediatePageTable<E: PageTable>: PageTable {
         let entry = self.get_entry_mut(addr);
         entry.set_addr(new_addr);
         entry.set_present(true);
+        // Set all intermediate page tables to allow writes - we'll control write access
+        // through individual, bottom level page table entries.
+        entry.set_write(true);
 
         new_table
     }
@@ -176,6 +179,9 @@ pub trait IntermediatePageTable<E: PageTable>: PageTable {
             let (new_table, new_addr) = E::alloc_new(allocator);
             entry.set_addr(new_addr);
             entry.set_present(true);
+            // Set all intermediate page tables to allow writes - we'll control write access
+            // through individual, bottom level page table entries.
+            entry.set_write(true);
 
             new_table
         }
