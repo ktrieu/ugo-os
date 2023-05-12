@@ -13,22 +13,29 @@ use crate::{
 pub struct MappingFlags {
     exec: bool,
     write: bool,
+    present: bool,
 }
 
 impl MappingFlags {
     pub fn set_for_entry(&self, entry: &mut PageTableEntry) {
         entry.set_no_exec(!self.exec);
         entry.set_write(self.write);
+        entry.set_present(self.present);
     }
 
-    pub fn new(exec: bool, write: bool) -> MappingFlags {
-        MappingFlags { exec, write }
+    pub fn new(exec: bool, write: bool, present: bool) -> MappingFlags {
+        MappingFlags {
+            exec,
+            write,
+            present,
+        }
     }
 
     pub fn new_rw_data() -> MappingFlags {
         MappingFlags {
             exec: false,
             write: true,
+            present: true,
         }
     }
 
@@ -36,6 +43,7 @@ impl MappingFlags {
         MappingFlags {
             exec: false,
             write: false,
+            present: true,
         }
     }
 
@@ -43,6 +51,15 @@ impl MappingFlags {
         MappingFlags {
             exec: true,
             write: false,
+            present: true,
+        }
+    }
+
+    pub fn new_guard() -> MappingFlags {
+        MappingFlags {
+            exec: false,
+            write: false,
+            present: false,
         }
     }
 }
@@ -56,7 +73,6 @@ fn map_page_entry(
     let entry = table.get_entry_mut(page.base_addr());
 
     entry.set_addr(frame.base_addr());
-    entry.set_present(true);
 
     flags.set_for_entry(entry);
 }

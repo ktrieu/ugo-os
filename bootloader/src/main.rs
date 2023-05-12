@@ -6,7 +6,7 @@ use core::panic::PanicInfo;
 
 use addr::VirtAddr;
 use common::PAGE_SIZE;
-use loader::LoaderResult;
+use loader::{KernelAddresses, LoaderResult};
 use uefi::prelude::*;
 
 #[macro_use]
@@ -54,8 +54,8 @@ fn load_kernel(
     mappings: &mut Mappings,
     allocator: &mut FrameAllocator,
     kernel_data: &[u8],
-) -> LoaderResult<VirtAddr> {
-    let loader = Loader::new(kernel_data)?;
+) -> LoaderResult<KernelAddresses> {
+    let mut loader = Loader::new(kernel_data)?;
 
     loader.load_kernel(mappings, allocator)
 }
@@ -103,22 +103,24 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     page_mappings.map_physical_memory(&memory_map, &mut frame_allocator);
     page_mappings.identity_map_fn(uefi_main as *const (), &mut frame_allocator);
 
-    let virt_entrypoint = match load_kernel(&mut page_mappings, &mut frame_allocator, file_data) {
+    let addresses = match load_kernel(&mut page_mappings, &mut frame_allocator, file_data) {
         Ok(loader) => loader,
         Err(err) => {
             panic!("Kernel load error: {}", err)
         }
     };
 
-    bootlog!("Kernel entrypoint: {}", virt_entrypoint);
+    bootlog!("Kernel entrypoint: {}", addresses.kernel_entry);
 
     // Fasten your seatbelts.
     unsafe {
         asm!(
             "mov cr3, {addr}
+            mov rsp, {stack_top}
             jmp {entry}",
             addr = in(reg) page_mappings.level_4_phys_addr().as_u64(),
-            entry = in(reg) virt_entrypoint.as_u64()
+            stack_top = in(reg) addresses.stack_top.as_u64(),
+            entry = in(reg) addresses.kernel_entry.as_u64()
         )
     }
 

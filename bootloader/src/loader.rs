@@ -1,3 +1,4 @@
+use core::cmp::max;
 use core::fmt::Display;
 use core::ptr::{copy_nonoverlapping, write_bytes};
 
@@ -13,8 +14,15 @@ use crate::{
     mappings::Mappings,
 };
 
+pub struct KernelAddresses {
+    pub kernel_end: VirtAddr,
+    pub kernel_entry: VirtAddr,
+    pub stack_top: VirtAddr,
+    pub stack_pages: u64,
+}
+
 pub struct Loader<'a> {
-    kernel_offset: PhysAddr,
+    kernel_phys_offset: PhysAddr,
     elf_file: ElfFile<'a>,
 }
 
@@ -55,15 +63,18 @@ fn is_valid_kernel_addr(addr: VirtAddr) -> bool {
 }
 
 fn phdr_flags_to_mappings_flags(header: &ProgramHeader) -> MappingFlags {
-    MappingFlags::new(header.flags().is_execute(), header.flags().is_write())
+    MappingFlags::new(header.flags().is_execute(), header.flags().is_write(), true)
 }
+
+// Doesn't really matter what this is, probably.
+const KERNEL_STACK_PAGES: u64 = 3;
 
 impl<'a> Loader<'a> {
     pub fn new(kernel_data: &'a [u8]) -> LoaderResult<Self> {
         let ptr = &kernel_data[0] as *const u8;
         let kernel_offset = PhysAddr::new(ptr as u64);
         Ok(Loader {
-            kernel_offset,
+            kernel_phys_offset: kernel_offset,
             elf_file: ElfFile::new(kernel_data)?,
         })
     }
@@ -81,7 +92,7 @@ impl<'a> Loader<'a> {
             // then zero the required memory. This is because the part of the frame in the file that should be zeroed
             // almost certainly contains other data.
             let src_frame = PhysFrame::from_containing_u64(
-                self.kernel_offset.as_u64() + phdr.offset() + zeroed_start,
+                self.kernel_phys_offset.as_u64() + phdr.offset() + zeroed_start,
             );
             let dst_frame = allocator.alloc_frame();
 
@@ -160,7 +171,7 @@ impl<'a> Loader<'a> {
         }
 
         let start_frame =
-            PhysFrame::from_containing_u64(self.kernel_offset.as_u64() + phdr.offset());
+            PhysFrame::from_containing_u64(self.kernel_phys_offset.as_u64() + phdr.offset());
         let end_frame = start_frame.add_frames(num_file_pages);
 
         let start_page = VirtPage::from_containing_u64(phdr.virtual_addr());
@@ -180,21 +191,72 @@ impl<'a> Loader<'a> {
         Ok(())
     }
 
-    // Loads the kernel and returns the virtual address of the entry point.
-    pub fn load_kernel(
-        &self,
+    fn create_kernel_stack(
+        &mut self,
+        kernel_end: VirtAddr,
         mappings: &mut Mappings,
         allocator: &mut FrameAllocator,
-    ) -> LoaderResult<VirtAddr> {
+    ) -> VirtAddr {
+        // Just grab the next frame after the kernel to start the stack.
+
+        // First a guard page. Just map the zero frame here.
+        let guard_page = VirtPage::from_containing_addr(kernel_end).next_page();
+        mappings.map_page(
+            PhysFrame::from_base_u64(0),
+            guard_page,
+            allocator,
+            MappingFlags::new_guard(),
+        );
+
+        bootlog!("Allocating guard page at {}", guard_page);
+
+        // Next, allocate the actual stack.
+        let stack_start = guard_page.next_page();
+        bootlog!("Stack start at {}", stack_start);
+        let stack_end = stack_start.add_pages(KERNEL_STACK_PAGES);
+        bootlog!("Stack end at {}", stack_end);
+        for page in stack_start.range_exclusive(stack_end) {
+            let frame = allocator.alloc_frame();
+            mappings.map_page(frame, page, allocator, MappingFlags::new_rw_data());
+        }
+
+        // The stack starts in the top of the page *before* stack_end, since it's an exclusive range.
+        // So, we need to bump the stack top address down. SystemV ABI says the pointer has to be aligned
+        // to a 16 byte boundary, so subtract that amount.
+        VirtAddr::new(stack_end.base_addr().as_u64() - 16)
+    }
+
+    // Loads the kernel and returns the virtual address of the entry point.
+    pub fn load_kernel(
+        &mut self,
+        mappings: &mut Mappings,
+        allocator: &mut FrameAllocator,
+    ) -> LoaderResult<KernelAddresses> {
+        let mut kernel_end = VirtAddr::new(0);
+
         for phdr in self.elf_file.program_iter() {
             if matches!(phdr.get_type()?, ProgramHeaderType::Load) {
                 self.map_load_segment(&phdr, mappings, allocator)?;
+                // Update the end of the kernel.
+                kernel_end = VirtAddr::new(max(
+                    kernel_end.as_u64(),
+                    phdr.virtual_addr() + phdr.mem_size(),
+                ));
             }
         }
 
-        let entrypoint = self.elf_file.header.pt2.entry_point();
+        bootlog!("Kernel end at {}", kernel_end);
 
-        // We'll deal with this later.
-        Ok(VirtAddr::new(entrypoint))
+        let stack_top = self.create_kernel_stack(kernel_end, mappings, allocator);
+        let kernel_entry = VirtAddr::new(self.elf_file.header.pt2.entry_point());
+
+        let addresses = KernelAddresses {
+            kernel_end,
+            kernel_entry,
+            stack_top,
+            stack_pages: KERNEL_STACK_PAGES,
+        };
+
+        Ok(addresses)
     }
 }

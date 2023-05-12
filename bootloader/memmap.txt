@@ -17,6 +17,10 @@ Kernel code/data (indeterminate)
 
 ---------------------------
 
-Kernel stack (4 pages?)
+Kernel stack guard page
+
+---------------------------
+
+Kernel stack (3 pages)
 
 ---------------------------
