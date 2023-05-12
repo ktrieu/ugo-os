@@ -15,11 +15,5 @@ fn panic(_info: &PanicInfo) -> ! {
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    loop {
-        unsafe {
-            for c in XYZ {
-                read_volatile(&XYZ);
-            }
-        }
-    }
+    loop {}
 }
