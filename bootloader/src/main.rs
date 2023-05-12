@@ -4,7 +4,6 @@
 use core::arch::asm;
 use core::panic::PanicInfo;
 
-use addr::VirtAddr;
 use common::PAGE_SIZE;
 use loader::{KernelAddresses, LoaderResult};
 use uefi::prelude::*;
@@ -21,7 +20,6 @@ mod mappings;
 mod page;
 
 use uefi::table::boot::MemoryType;
-use xmas_elf::ElfFile;
 
 use crate::frame::FrameAllocator;
 use crate::loader::Loader;

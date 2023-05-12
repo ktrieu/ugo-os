@@ -157,13 +157,6 @@ impl<'a> Mappings<'a> {
         )
     }
 
-    pub unsafe fn activate(&self) {
-        asm!(
-            "mov cr3, {addr}",
-            addr = in(reg) self.level_4_phys_addr.as_u64()
-        );
-    }
-
     pub fn level_4_phys_addr(&self) -> PhysAddr {
         self.level_4_phys_addr
     }

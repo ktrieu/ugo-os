@@ -20,7 +20,7 @@ fn outb(port: u16, byte: u8) {
 }
 
 fn inb(port: u16) -> u8 {
-    let mut ret: u8 = 0;
+    let mut ret: u8;
     unsafe {
         asm!(
             "in {ret}, dx",

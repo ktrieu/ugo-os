@@ -32,10 +32,6 @@ impl PageTableEntry {
         self.entry = self.entry & !(1 << index) | ((flag as u64) << index);
     }
 
-    pub fn new() -> PageTableEntry {
-        PageTableEntry { entry: 0 }
-    }
-
     pub fn present(&self) -> bool {
         self.get_flag(PageTableEntry::PRESENT_IDX)
     }
