@@ -3,6 +3,8 @@
 
 use core::{arch::asm, panic::PanicInfo};
 
+use common::BootInfo;
+
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
@@ -47,7 +49,7 @@ fn write_serial(c: u8) {
 const MSG: &'static [u8] = b"HELLO FROM UGO-OS";
 
 #[no_mangle]
-pub extern "C" fn _start() -> ! {
+pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     outb(COM1 + 1, 0x00); // Disable all interrupts
     outb(COM1 + 3, 0x80); // Enable DLAB (set baud rate divisor)
     outb(COM1 + 0, 0x03); // Set divisor to 3 (lo byte) 38400 baud
@@ -59,8 +61,12 @@ pub extern "C" fn _start() -> ! {
     outb(COM1 + 0, 0xAE);
     outb(COM1 + 4, 0x0F);
 
-    for c in MSG {
-        write_serial(*c);
+    for region in &*boot_info.mem_regions {
+        match region.ty {
+            common::RegionType::Usable => write_serial(b'U'),
+            common::RegionType::Allocated => write_serial(b'A'),
+            common::RegionType::Bootloader => write_serial(b'B'),
+        }
     }
 
     loop {}

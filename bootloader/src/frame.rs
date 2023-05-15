@@ -1,3 +1,4 @@
+use common::PAGE_SIZE;
 use uefi::table::boot::{MemoryMap, MemoryType};
 
 use crate::addr::{PhysAddr, PhysFrame};
@@ -46,5 +47,13 @@ impl FrameAllocator {
 
     pub fn alloc_end(&self) -> PhysAddr {
         self.alloc_end.base_addr()
+    }
+
+    pub fn frames_allocated(&self) -> u64 {
+        (self.next_frame.base_addr().as_u64() - self.alloc_start.base_addr().as_u64()) / PAGE_SIZE
+    }
+
+    pub fn next_frame(&self) -> PhysFrame {
+        self.next_frame
     }
 }

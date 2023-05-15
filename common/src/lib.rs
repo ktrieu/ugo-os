@@ -29,6 +29,7 @@ pub const PHYSADDR_SIZE: u8 = 52;
 // This is the number of bits that are used in a virtual address. The upper bits must be sign-extended.
 pub const VIRTADDR_SIZE: u8 = 48;
 
+#[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum RegionType {
     Usable,
@@ -40,8 +41,7 @@ pub enum RegionType {
 #[derive(Debug, Clone, Copy)]
 pub struct MemRegion {
     pub start: u64,
-    // End address, exclusive
-    pub end: u64,
+    pub pages: u64,
     pub ty: RegionType,
 }
 
@@ -67,6 +67,21 @@ impl ops::DerefMut for MemRegions {
 }
 
 #[repr(C)]
+pub enum FramebufferFormat {
+    Bgr,
+}
+
+#[repr(C)]
+pub struct FramebufferInfo {
+    pub address: *mut u8,
+    pub format: FramebufferFormat,
+    pub stride: usize,
+    pub width: usize,
+    pub height: usize,
+}
+
+#[repr(C)]
 pub struct BootInfo {
-    mem_regions: MemRegion,
+    pub mem_regions: MemRegions,
+    pub framebuffer: FramebufferInfo,
 }

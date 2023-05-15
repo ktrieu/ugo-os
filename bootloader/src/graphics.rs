@@ -13,6 +13,7 @@ pub fn locate_gop<'a>(
     boot_services.open_protocol_exclusive(handle)
 }
 
+#[derive(Clone, Copy)]
 pub struct Framebuffer {
     addr: *mut u8,
     mode: ModeInfo,
@@ -50,8 +51,12 @@ impl Framebuffer {
         })
     }
 
-    fn stride(&self) -> u32 {
+    pub fn stride(&self) -> u32 {
         self.mode.stride().try_into().unwrap()
+    }
+
+    pub fn format(&self) -> PixelFormat {
+        self.mode.pixel_format()
     }
 
     fn coords_to_offset(&self, x: u32, y: u32) -> isize {
@@ -141,6 +146,10 @@ impl<'a> Console {
             cx: 0,
             cy: 0,
         })
+    }
+
+    pub fn framebuffer(&self) -> Framebuffer {
+        self.framebuffer
     }
 
     fn char_to_framebuffer(&self, cx: u32, cy: u32) -> (u32, u32) {

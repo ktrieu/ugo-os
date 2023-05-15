@@ -4,7 +4,7 @@
 use core::arch::asm;
 use core::panic::PanicInfo;
 
-use common::PAGE_SIZE;
+use common::{BootInfo, PAGE_SIZE};
 use loader::{KernelAddresses, LoaderResult};
 use uefi::prelude::*;
 
@@ -12,6 +12,7 @@ use uefi::prelude::*;
 mod logger;
 
 mod addr;
+mod boot_info;
 mod frame;
 mod fs;
 mod graphics;
@@ -21,8 +22,10 @@ mod page;
 
 use uefi::table::boot::MemoryType;
 
+use crate::boot_info::create_boot_info;
 use crate::frame::FrameAllocator;
 use crate::loader::Loader;
+use crate::logger::LOGGER;
 use crate::mappings::Mappings;
 
 #[panic_handler]
@@ -60,6 +63,27 @@ fn load_kernel(
 
 // We grab at least 256 frames (1 GB) of physical memory for boot purposes
 const MIN_BOOT_PHYS_FRAMES: u64 = 256;
+
+fn jump_to_kernel(
+    level_4_address: u64,
+    stack_top: u64,
+    kernel_entry: u64,
+    boot_info_ptr: *mut BootInfo,
+) {
+    // Fasten your seatbelts.
+    unsafe {
+        asm!(
+            "
+            mov cr3, {addr}
+            mov rsp, {stack_top}
+            jmp {entry}",
+            addr = in(reg) level_4_address,
+            stack_top = in(reg) stack_top,
+            entry = in(reg) kernel_entry,
+            in("rdi") boot_info_ptr
+        )
+    }
+}
 
 #[entry]
 fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
@@ -99,7 +123,7 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
 
     let mut page_mappings = Mappings::new(&mut frame_allocator);
     page_mappings.map_physical_memory(&memory_map, &mut frame_allocator);
-    page_mappings.identity_map_fn(uefi_main as *const (), &mut frame_allocator);
+    page_mappings.identity_map_fn(jump_to_kernel as *const (), &mut frame_allocator);
 
     let addresses = match load_kernel(&mut page_mappings, &mut frame_allocator, file_data) {
         Ok(loader) => loader,
@@ -108,19 +132,23 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
         }
     };
 
+    // This is kind of ugh, but whatever.
+    let framebuffer = LOGGER.try_get().unwrap().lock().framebuffer();
+    let boot_info_ptr = create_boot_info(
+        &mut frame_allocator,
+        &mut page_mappings,
+        &framebuffer,
+        memory_map,
+    );
+
     bootlog!("Kernel entrypoint: {}", addresses.kernel_entry);
 
-    // Fasten your seatbelts.
-    unsafe {
-        asm!(
-            "mov cr3, {addr}
-            mov rsp, {stack_top}
-            jmp {entry}",
-            addr = in(reg) page_mappings.level_4_phys_addr().as_u64(),
-            stack_top = in(reg) addresses.stack_top.as_u64(),
-            entry = in(reg) addresses.kernel_entry.as_u64()
-        )
-    }
+    jump_to_kernel(
+        page_mappings.level_4_phys_addr().as_u64(),
+        addresses.stack_top.as_u64(),
+        addresses.kernel_entry.as_u64(),
+        boot_info_ptr,
+    );
 
     loop {}
 }
