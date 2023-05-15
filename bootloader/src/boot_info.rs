@@ -13,8 +13,8 @@ use uefi::{
 };
 
 use crate::{
-    addr::{align_down, Address, PhysAddr, PhysFrame, VirtPage},
-    frame::{self, FrameAllocator},
+    addr::{Address, Page, PhysAddr, PhysFrame, VirtPage},
+    frame::FrameAllocator,
     graphics::Framebuffer,
     mappings::{MappingFlags, Mappings},
 };
@@ -44,7 +44,7 @@ impl BootInfoAllocator {
 
         let next = self.current.align_up(align as u64);
         self.current = PhysAddr::new(next.as_u64() + size as u64);
-        if self.current.as_u64() >= self.frame.next_frame().base_addr().as_u64() {
+        if self.current.as_u64() >= self.frame.next().base_u64() {
             panic!("No space left in BootInfoAllocator!");
         }
 
@@ -57,7 +57,7 @@ impl BootInfoAllocator {
 
         let next = self.current.align_up(layout.align() as u64);
         self.current = PhysAddr::new(next.as_u64() + layout.size() as u64);
-        if self.current.as_u64() >= self.frame.next_frame().base_addr().as_u64() {
+        if self.current.as_u64() >= self.frame.next().base_u64() {
             panic!("No space left in BootInfoAllocator!");
         }
 

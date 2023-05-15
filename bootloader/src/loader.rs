@@ -6,7 +6,7 @@ use common::{KERNEL_START, PAGE_SIZE};
 use xmas_elf::program::{ProgramHeader, Type as ProgramHeaderType};
 use xmas_elf::ElfFile;
 
-use crate::addr::{align_down, align_up, is_aligned, Address, PhysFrame, VirtPage};
+use crate::addr::{align_down, align_up, is_aligned, Address, Page, PhysFrame, VirtPage};
 use crate::frame::FrameAllocator;
 use crate::mappings::MappingFlags;
 use crate::{
@@ -117,7 +117,7 @@ impl<'a> Loader<'a> {
             // And map it in.
             let pages_to_zeroed_start = align_down(zeroed_start, PAGE_SIZE) / PAGE_SIZE;
             let page =
-                VirtPage::from_containing_u64(phdr.virtual_addr()).add_pages(pages_to_zeroed_start);
+                VirtPage::from_containing_u64(phdr.virtual_addr()).increment(pages_to_zeroed_start);
             mappings.map_page(
                 dst_frame,
                 page,
@@ -132,9 +132,8 @@ impl<'a> Loader<'a> {
         let pages_to_map = align_up(zero_bytes, PAGE_SIZE) / PAGE_SIZE;
 
         let start_page = VirtPage::from_containing_u64(phdr.virtual_addr());
-        let end_page = start_page.add_pages(pages_to_map);
 
-        for page in start_page.range_inclusive(end_page) {
+        for page in VirtPage::range_length(start_page, pages_to_map).iter() {
             let new_frame = allocator.alloc_frame();
             // Zero our frame.
             // Safety: Since dst_frame is a fresh page, it's aligned and clear to write a page of zeroes to.
@@ -172,15 +171,18 @@ impl<'a> Loader<'a> {
 
         let start_frame =
             PhysFrame::from_containing_u64(self.kernel_phys_offset.as_u64() + phdr.offset());
-        let end_frame = start_frame.add_frames(num_file_pages);
-
         let start_page = VirtPage::from_containing_u64(phdr.virtual_addr());
-        let end_page = start_page.add_pages(num_file_pages);
 
-        let frames = start_frame.range_inclusive(end_frame);
-        let pages = start_page.range_inclusive(end_page);
+        let frames = PhysFrame::range_length(start_frame, num_file_pages);
+        let pages = VirtPage::range_length(start_page, num_file_pages);
+        bootlog!(
+            "Mapping {} pages starting at {}",
+            num_file_pages,
+            start_page
+        );
 
-        for (frame, page) in frames.zip(pages) {
+        for (frame, page) in frames.iter().zip(pages.iter()) {
+            bootlog!("Mapping {}", page);
             mappings.map_page(frame, page, allocator, phdr_flags_to_mappings_flags(phdr));
         }
 
@@ -200,7 +202,7 @@ impl<'a> Loader<'a> {
         // Just grab the next frame after the kernel to start the stack.
 
         // First a guard page. Just map the zero frame here.
-        let guard_page = VirtPage::from_containing_addr(kernel_end).next_page();
+        let guard_page = VirtPage::from_containing_addr(kernel_end).next();
         mappings.map_page(
             PhysFrame::from_base_u64(0),
             guard_page,
@@ -211,11 +213,11 @@ impl<'a> Loader<'a> {
         bootlog!("Allocating guard page at {}", guard_page);
 
         // Next, allocate the actual stack.
-        let stack_start = guard_page.next_page();
-        bootlog!("Stack start at {}", stack_start);
-        let stack_end = stack_start.add_pages(KERNEL_STACK_PAGES);
-        bootlog!("Stack end at {}", stack_end);
-        for page in stack_start.range_exclusive(stack_end) {
+        let stack_start = guard_page.next();
+        let stack_pages = VirtPage::range_length(stack_start, KERNEL_STACK_PAGES);
+        bootlog!("Stack start at {}", stack_pages.first());
+        bootlog!("Stack end at {}", stack_pages.last());
+        for page in VirtPage::range_length(stack_start, KERNEL_STACK_PAGES).iter() {
             let frame = allocator.alloc_frame();
             mappings.map_page(frame, page, allocator, MappingFlags::new_rw_data());
         }
@@ -223,7 +225,7 @@ impl<'a> Loader<'a> {
         // The stack starts in the top of the page *before* stack_end, since it's an exclusive range.
         // So, we need to bump the stack top address down. SystemV ABI says the pointer has to be aligned
         // to a 16 byte boundary, so subtract that amount.
-        VirtAddr::new(stack_end.base_addr().as_u64() - 16)
+        VirtAddr::new(stack_pages.last().base_u64() - 16)
     }
 
     // Loads the kernel and returns the virtual address of the entry point.

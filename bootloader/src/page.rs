@@ -7,7 +7,7 @@ use core::fmt::Display;
 use common::{PAGE_SIZE, PHYSADDR_SIZE};
 
 use crate::{
-    addr::{Address, PhysAddr, VirtAddr},
+    addr::{Address, Page, PhysAddr, VirtAddr},
     frame::FrameAllocator,
 };
 
@@ -118,7 +118,7 @@ pub trait PageTable: Sized {
         // Safety: An intermediate page table can fit into exactly one physical frame, which is returned for use
         // by the FrameAllocator. The page table is cleared to a valid state.
         unsafe {
-            let ptr = frame.base_addr().as_u64() as *mut Self;
+            let ptr = frame.base_u64() as *mut Self;
             let reference = &mut *ptr;
             reference.clear();
             (reference, frame.base_addr())

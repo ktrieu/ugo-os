@@ -4,7 +4,7 @@ use common::{KERNEL_START, PHYSMEM_START};
 use uefi::table::boot::MemoryMap;
 
 use crate::{
-    addr::{PhysAddr, PhysFrame, VirtPage},
+    addr::{Page, PhysAddr, PhysFrame, VirtPage},
     frame::FrameAllocator,
     page::{IntermediatePageTable, PageMapLevel4, PageTableEntry},
     page::{PageMapLevel1, PageTable},
@@ -115,10 +115,12 @@ impl<'a> Mappings<'a> {
 
         let start_frame = PhysFrame::from_base_u64(0);
         let end_frame = PhysFrame::from_base_u64(highest_segment.phys_start)
-            .add_frames(highest_segment.page_count);
+            .increment(highest_segment.page_count);
+        let frame_range = PhysFrame::range_inclusive(start_frame, end_frame);
 
         let start_page = start_frame.to_virt_page(PHYSMEM_START);
         let end_page = end_frame.to_virt_page(PHYSMEM_START);
+        let page_range = VirtPage::range_inclusive(start_page, end_page);
 
         bootlog!(
             "Mapping all physical memory.\n{} - {}\n{} - {}",
@@ -128,10 +130,7 @@ impl<'a> Mappings<'a> {
             end_page
         );
 
-        let frame_range = start_frame.range_inclusive(end_frame);
-        let page_range = start_page.range_inclusive(end_page);
-
-        for (frame, page) in frame_range.zip(page_range) {
+        for (frame, page) in frame_range.iter().zip(page_range.iter()) {
             self.map_page(frame, page, allocator, MappingFlags::new_rw_data());
         }
     }
@@ -148,10 +147,10 @@ impl<'a> Mappings<'a> {
 
         self.map_page(frame, page, allocator, MappingFlags::new_code());
         // The function might lie on a page boundary, so map the next one too.
-        bootlog!("Identity mapping {}", frame.next_frame());
+        bootlog!("Identity mapping {}", frame.next());
         self.map_page(
-            frame.next_frame(),
-            page.next_page(),
+            frame.next(),
+            page.next(),
             allocator,
             MappingFlags::new_code(),
         )
