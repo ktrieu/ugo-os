@@ -1,9 +1,9 @@
 #![no_std]
 #![no_main]
 
-use core::{arch::asm, panic::PanicInfo};
+use core::{arch::asm, fmt::Write, panic::PanicInfo};
 
-use common::BootInfo;
+use common::{BootInfo, PAGE_SIZE};
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
@@ -46,7 +46,17 @@ fn write_serial(c: u8) {
     outb(COM1, c);
 }
 
-const MSG: &'static [u8] = b"HELLO FROM UGO-OS";
+pub struct SerialConsole {}
+
+impl core::fmt::Write for SerialConsole {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        for c in s.as_bytes() {
+            write_serial(*c);
+        }
+
+        Ok(())
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
@@ -61,12 +71,23 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     outb(COM1 + 0, 0xAE);
     outb(COM1 + 4, 0x0F);
 
+    let mut console = SerialConsole {};
+
     for region in &*boot_info.mem_regions {
-        match region.ty {
-            common::RegionType::Usable => write_serial(b'U'),
-            common::RegionType::Allocated => write_serial(b'A'),
-            common::RegionType::Bootloader => write_serial(b'B'),
-        }
+        let ty_code = match region.ty {
+            common::RegionType::Usable => 'U',
+            common::RegionType::Allocated => 'A',
+            common::RegionType::Bootloader => 'B',
+        };
+        write!(
+            console,
+            "{}: {} pages ({:#016x} - {:#016x})\r\n",
+            ty_code,
+            region.pages,
+            region.start,
+            region.start + (region.pages * PAGE_SIZE)
+        )
+        .unwrap();
     }
 
     loop {}
