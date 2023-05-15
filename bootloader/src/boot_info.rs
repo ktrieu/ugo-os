@@ -13,7 +13,7 @@ use uefi::{
 };
 
 use crate::{
-    addr::{align_down, PhysAddr, PhysFrame, VirtPage},
+    addr::{align_down, Address, PhysAddr, PhysFrame, VirtPage},
     frame::{self, FrameAllocator},
     graphics::Framebuffer,
     mappings::{MappingFlags, Mappings},

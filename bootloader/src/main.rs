@@ -22,6 +22,7 @@ mod page;
 
 use uefi::table::boot::MemoryType;
 
+use crate::addr::Address;
 use crate::boot_info::create_boot_info;
 use crate::frame::FrameAllocator;
 use crate::loader::Loader;

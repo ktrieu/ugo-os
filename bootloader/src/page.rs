@@ -7,7 +7,7 @@ use core::fmt::Display;
 use common::{PAGE_SIZE, PHYSADDR_SIZE};
 
 use crate::{
-    addr::{PhysAddr, VirtAddr},
+    addr::{Address, PhysAddr, VirtAddr},
     frame::FrameAllocator,
 };
 

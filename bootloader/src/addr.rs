@@ -22,11 +22,43 @@ pub fn is_aligned(addr: u64, align: u64) -> bool {
     align_down(addr, align) == addr
 }
 
+pub trait Address
+where
+    Self: Sized,
+{
+    fn as_u64(&self) -> u64;
+    fn new(addr: u64) -> Self;
+
+    fn align_down(&self, align: u64) -> Self {
+        Self::new(align_down(self.as_u64(), align))
+    }
+
+    fn align_up(&self, align: u64) -> Self {
+        Self::new(align_up(self.as_u64(), align))
+    }
+
+    fn is_aligned(&self, align: u64) -> bool {
+        is_aligned(self.as_u64(), align)
+    }
+
+    fn as_u8_ptr(&self) -> *const u8 {
+        self.as_u64() as *const u8
+    }
+
+    fn as_u8_ptr_mut(&self) -> *mut u8 {
+        self.as_u64() as *mut u8
+    }
+}
+
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
 pub struct PhysAddr(u64);
 
-impl PhysAddr {
-    pub fn new(addr: u64) -> PhysAddr {
+impl Address for PhysAddr {
+    fn as_u64(&self) -> u64 {
+        self.0
+    }
+
+    fn new(addr: u64) -> Self {
         let upper_bits = addr >> PHYSADDR_SIZE;
         if upper_bits != 0 {
             panic!(
@@ -37,30 +69,6 @@ impl PhysAddr {
         }
 
         PhysAddr(addr)
-    }
-
-    pub fn align_down(&self, align: u64) -> PhysAddr {
-        PhysAddr(align_down(self.0, align))
-    }
-
-    pub fn align_up(&self, align: u64) -> PhysAddr {
-        PhysAddr(align_up(self.0, align))
-    }
-
-    pub fn is_aligned(&self, align: u64) -> bool {
-        is_aligned(self.0, align)
-    }
-
-    pub fn as_u64(self) -> u64 {
-        self.0
-    }
-
-    pub fn as_u8_ptr(&self) -> *const u8 {
-        self.0 as *const u8
-    }
-
-    pub fn as_u8_ptr_mut(&self) -> *mut u8 {
-        self.0 as *mut u8
     }
 }
 
@@ -193,26 +201,6 @@ impl VirtAddr {
     // The mask for the index into a page map level 4.
     const PAGE_MAP_L4_IDX_MASK: u64 = VirtAddr::PAGE_DIR_PTR_IDX_MASK << VirtAddr::ENTRY_IDX_SIZE;
 
-    pub fn new(addr: u64) -> VirtAddr {
-        // Check if the address is in canonical form (sign-extended) first.
-        let upper_bit = addr & (1 << VIRTADDR_SIZE - 1) > 0;
-
-        let required_sign_extension = if upper_bit {
-            2_u64.pow(64 - VIRTADDR_SIZE as u32) - 1
-        } else {
-            0
-        };
-
-        let sign_extension = addr >> VIRTADDR_SIZE;
-        assert!(
-            sign_extension == required_sign_extension,
-            "Address {:#016x} was not a canonical virtual address!",
-            addr
-        );
-
-        VirtAddr(addr)
-    }
-
     pub fn get_page_table_idx(&self) -> u64 {
         (self.0 & VirtAddr::PAGE_TABLE_IDX_MASK) >> VirtAddr::PAGE_OFFSET_SIZE
     }
@@ -231,21 +219,31 @@ impl VirtAddr {
         (self.0 & VirtAddr::PAGE_MAP_L4_IDX_MASK)
             >> VirtAddr::ENTRY_IDX_SIZE * 3 + VirtAddr::PAGE_OFFSET_SIZE
     }
+}
 
-    pub fn as_u64(&self) -> u64 {
+impl Address for VirtAddr {
+    fn as_u64(&self) -> u64 {
         self.0
     }
 
-    pub fn align_up(&self, align: u64) -> VirtAddr {
-        VirtAddr(align_up(self.0, align))
-    }
+    fn new(addr: u64) -> Self {
+        // Check if the address is in canonical form (sign-extended) first.
+        let upper_bit = addr & (1 << VIRTADDR_SIZE - 1) > 0;
 
-    pub fn align_down(&self, align: u64) -> VirtAddr {
-        VirtAddr(align_down(self.0, align))
-    }
+        let required_sign_extension = if upper_bit {
+            2_u64.pow(64 - VIRTADDR_SIZE as u32) - 1
+        } else {
+            0
+        };
 
-    pub fn is_aligned(&self, align: u64) -> bool {
-        is_aligned(self.0, align)
+        let sign_extension = addr >> VIRTADDR_SIZE;
+        assert!(
+            sign_extension == required_sign_extension,
+            "Address {:#016x} was not a canonical virtual address!",
+            addr
+        );
+
+        VirtAddr(addr)
     }
 }
 
