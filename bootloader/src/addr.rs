@@ -80,7 +80,7 @@ impl Iterator for FrameIterExclusive {
 
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.curr;
-        if ret.base_addr() > self.end.base_addr() {
+        if ret.base_addr() >= self.end.base_addr() {
             None
         } else {
             self.curr = ret.next_frame();
@@ -99,7 +99,7 @@ impl Iterator for FrameIterInclusive {
 
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.curr;
-        if ret.base_addr() >= self.end.base_addr() {
+        if ret.base_addr() > self.end.base_addr() {
             None
         } else {
             self.curr = ret.next_frame();
@@ -265,7 +265,7 @@ impl Iterator for PageIterExclusive {
 
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.curr;
-        if ret.base_addr() > self.end.base_addr() {
+        if ret.base_addr() >= self.end.base_addr() {
             None
         } else {
             self.curr = ret.next_page();
@@ -284,7 +284,7 @@ impl Iterator for PageIterInclusive {
 
     fn next(&mut self) -> Option<Self::Item> {
         let ret = self.curr;
-        if ret.base_addr() >= self.end.base_addr() {
+        if ret.base_addr() > self.end.base_addr() {
             None
         } else {
             self.curr = ret.next_page();
