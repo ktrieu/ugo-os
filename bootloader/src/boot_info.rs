@@ -150,7 +150,7 @@ pub fn create_boot_info(
             let remaining_region = MemRegion {
                 start: frame_allocator.next_frame().base_addr().as_u64(),
                 pages: entry.page_count - frame_allocator.frames_allocated(),
-                ty: RegionType::Bootloader,
+                ty: RegionType::Usable,
             };
             mem_regions[idx].write(remaining_region);
             idx += 1
