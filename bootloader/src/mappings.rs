@@ -112,6 +112,19 @@ impl<'a> Mappings<'a> {
         }
     }
 
+    pub fn alloc_and_map_range(
+        &mut self,
+        pages: PageRange<VirtPage>,
+        allocator: &mut FrameAllocator,
+        flags: MappingFlags,
+    ) -> PageRange<PhysFrame> {
+        let frames = allocator.alloc_frame_range(pages.len());
+
+        self.map_page_range(frames, pages, allocator, flags);
+
+        frames
+    }
+
     pub fn map_physical_memory(&mut self, memory_map: &MemoryMap, allocator: &mut FrameAllocator) {
         let highest_segment = memory_map
             .entries()

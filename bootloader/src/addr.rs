@@ -268,7 +268,7 @@ impl<P: Page> Iterator for PageRangeIter<P> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub struct PhysFrame(PhysAddr);
 
 impl PhysFrame {
@@ -300,7 +300,7 @@ impl Display for PhysFrame {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub struct VirtPage(VirtAddr);
 
 impl Page for VirtPage {

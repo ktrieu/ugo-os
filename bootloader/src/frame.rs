@@ -1,7 +1,7 @@
 use common::PAGE_SIZE;
 use uefi::table::boot::{MemoryMap, MemoryType};
 
-use crate::addr::{Address, Page, PhysAddr, PhysFrame};
+use crate::addr::{Address, Page, PageRange, PhysAddr, PhysFrame};
 
 pub struct FrameAllocator {
     // The first frame we've allocated, inclusive
@@ -39,6 +39,20 @@ impl FrameAllocator {
         self.next_frame = ret.next();
 
         ret
+    }
+
+    pub fn alloc_frame_range(&mut self, len: u64) -> PageRange<PhysFrame> {
+        let start = self.next_frame();
+        let range = PhysFrame::range_length(start, len);
+
+        for _ in 0..len {
+            self.alloc_frame();
+        }
+
+        // Make sure the range we're returning and our internal allocation state matches.
+        assert!(self.next_frame == range.last().next());
+
+        range
     }
 
     pub fn alloc_start(&self) -> PhysAddr {

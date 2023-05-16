@@ -132,21 +132,17 @@ impl<'a> Loader<'a> {
         let pages_to_map = align_up(zero_bytes, PAGE_SIZE) / PAGE_SIZE;
 
         let start_page = VirtPage::from_containing_u64(phdr.virtual_addr());
+        let pages = VirtPage::range_length(start_page, pages_to_map);
 
-        for page in VirtPage::range_length(start_page, pages_to_map).iter() {
-            let new_frame = allocator.alloc_frame();
-            // Zero our frame.
+        let frames =
+            mappings.alloc_and_map_range(pages, allocator, phdr_flags_to_mappings_flags(phdr));
+
+        for frame in frames.iter() {
+            // Zero the frames we allocated.
             // Safety: Since dst_frame is a fresh page, it's aligned and clear to write a page of zeroes to.
             unsafe {
-                write_bytes(new_frame.as_u8_ptr_mut(), 0, PAGE_SIZE as usize);
+                write_bytes(frame.as_u8_ptr_mut(), 0, PAGE_SIZE as usize);
             }
-
-            mappings.map_page(
-                new_frame,
-                page,
-                allocator,
-                phdr_flags_to_mappings_flags(phdr),
-            );
         }
 
         Ok(())
@@ -209,10 +205,7 @@ impl<'a> Loader<'a> {
         let stack_pages = VirtPage::range_length(stack_start, KERNEL_STACK_PAGES);
         bootlog!("Stack start at {}", stack_pages.first());
         bootlog!("Stack end at {}", stack_pages.last());
-        for page in VirtPage::range_length(stack_start, KERNEL_STACK_PAGES).iter() {
-            let frame = allocator.alloc_frame();
-            mappings.map_page(frame, page, allocator, MappingFlags::new_rw_data());
-        }
+        mappings.alloc_and_map_range(stack_pages, allocator, MappingFlags::new_rw_data());
 
         // The stack starts in the top of the page *before* stack_end, since it's an exclusive range.
         // So, we need to bump the stack top address down. SystemV ABI says the pointer has to be aligned
