@@ -118,6 +118,7 @@ impl<'a> Loader<'a> {
             let pages_to_zeroed_start = align_down(zeroed_start, PAGE_SIZE) / PAGE_SIZE;
             let page =
                 VirtPage::from_containing_u64(phdr.virtual_addr()).increment(pages_to_zeroed_start);
+
             mappings.map_page(
                 dst_frame,
                 page,
@@ -155,7 +156,10 @@ impl<'a> Loader<'a> {
         allocator: &mut FrameAllocator,
     ) -> LoaderResult<()> {
         let vaddr = VirtAddr::new(phdr.virtual_addr());
-        let num_file_pages = align_up(phdr.file_size(), PAGE_SIZE) / PAGE_SIZE;
+        let pages = VirtPage::range_inclusive(
+            VirtPage::from_containing_addr(vaddr),
+            VirtPage::from_containing_u64(phdr.virtual_addr() + phdr.file_size()),
+        );
 
         if !is_valid_kernel_addr(vaddr) {
             return Err(LoaderError::InvalidKernelSegmentAddress(vaddr));
@@ -167,10 +171,8 @@ impl<'a> Loader<'a> {
 
         let start_frame =
             PhysFrame::from_containing_u64(self.kernel_phys_offset.as_u64() + phdr.offset());
-        let start_page = VirtPage::from_containing_u64(phdr.virtual_addr());
 
-        let frames = PhysFrame::range_length(start_frame, num_file_pages);
-        let pages = VirtPage::range_length(start_page, num_file_pages);
+        let frames = PhysFrame::range_length(start_frame, pages.len());
 
         mappings.map_page_range(frames, pages, allocator, phdr_flags_to_mappings_flags(phdr));
 
