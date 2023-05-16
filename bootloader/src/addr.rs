@@ -231,6 +231,10 @@ impl<P: Page> PageRange<P> {
         self.end.decrement(1)
     }
 
+    pub fn len(&self) -> u64 {
+        (self.end.base_u64() - self.start.base_u64()) / PAGE_SIZE
+    }
+
     pub fn contains(&self, page: P) -> bool {
         page.base_u64() >= self.start.base_u64() && page.base_u64() < self.end.base_u64()
     }

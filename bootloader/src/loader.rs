@@ -175,16 +175,8 @@ impl<'a> Loader<'a> {
 
         let frames = PhysFrame::range_length(start_frame, num_file_pages);
         let pages = VirtPage::range_length(start_page, num_file_pages);
-        bootlog!(
-            "Mapping {} pages starting at {}",
-            num_file_pages,
-            start_page
-        );
 
-        for (frame, page) in frames.iter().zip(pages.iter()) {
-            bootlog!("Mapping {}", page);
-            mappings.map_page(frame, page, allocator, phdr_flags_to_mappings_flags(phdr));
-        }
+        mappings.map_page_range(frames, pages, allocator, phdr_flags_to_mappings_flags(phdr));
 
         if phdr.mem_size() > phdr.file_size() {
             self.map_zeroed_memory(phdr, mappings, allocator)?;

@@ -2,12 +2,13 @@ use common::PHYSMEM_START;
 use uefi::table::boot::MemoryMap;
 
 use crate::{
-    addr::{Page, PhysAddr, PhysFrame, VirtPage},
+    addr::{Page, PageRange, PhysAddr, PhysFrame, VirtPage},
     frame::FrameAllocator,
     page::{IntermediatePageTable, PageMapLevel4, PageTableEntry},
     page::{PageMapLevel1, PageTable},
 };
 
+#[derive(Clone, Copy)]
 pub struct MappingFlags {
     exec: bool,
     write: bool,
@@ -97,6 +98,20 @@ impl<'a> Mappings<'a> {
         map_page_entry(frame, page, level_1_map, flags);
     }
 
+    pub fn map_page_range(
+        &mut self,
+        frames: PageRange<PhysFrame>,
+        pages: PageRange<VirtPage>,
+        allocator: &mut FrameAllocator,
+        flags: MappingFlags,
+    ) {
+        assert!(frames.len() == pages.len());
+
+        for (frame, page) in frames.iter().zip(pages.iter()) {
+            self.map_page(frame, page, allocator, flags);
+        }
+    }
+
     pub fn map_physical_memory(&mut self, memory_map: &MemoryMap, allocator: &mut FrameAllocator) {
         let highest_segment = memory_map
             .entries()
@@ -120,9 +135,12 @@ impl<'a> Mappings<'a> {
             end_page
         );
 
-        for (frame, page) in frame_range.iter().zip(page_range.iter()) {
-            self.map_page(frame, page, allocator, MappingFlags::new_rw_data());
-        }
+        self.map_page_range(
+            frame_range,
+            page_range,
+            allocator,
+            MappingFlags::new_rw_data(),
+        );
     }
 
     // fn_ptr should be derived from a function, but I can't have a "pointer to any function"
