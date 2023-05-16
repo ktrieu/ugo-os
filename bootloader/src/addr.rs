@@ -1,4 +1,4 @@
-use core::{fmt::Display, marker::PhantomData};
+use core::fmt::Display;
 
 use common::{PAGE_SIZE, PHYSADDR_SIZE, VIRTADDR_SIZE};
 
@@ -149,14 +149,16 @@ impl Display for VirtAddr {
 }
 
 // A virtual page/physical frame.
-pub trait Page<A: Address>
+pub trait Page
 where
     Self: Sized + Copy,
 {
-    fn from_base_addr(addr: A) -> Self;
-    fn base_addr(&self) -> A;
+    type A: Address;
 
-    fn from_containing_addr(addr: A) -> Self {
+    fn from_base_addr(addr: Self::A) -> Self;
+    fn base_addr(&self) -> Self::A;
+
+    fn from_containing_addr(addr: Self::A) -> Self {
         let aligned = addr.align_down(PAGE_SIZE);
 
         Self::from_base_addr(aligned)
@@ -174,25 +176,25 @@ where
         self.increment(1)
     }
 
-    fn range_inclusive(start: Self, end: Self) -> PageRange<Self, A> {
+    fn range_inclusive(start: Self, end: Self) -> PageRange<Self> {
         PageRange::new(start, end.next())
     }
 
-    fn range_exclusive(start: Self, end: Self) -> PageRange<Self, A> {
+    fn range_exclusive(start: Self, end: Self) -> PageRange<Self> {
         PageRange::new(start, end)
     }
 
-    fn range_length(start: Self, n: u64) -> PageRange<Self, A> {
+    fn range_length(start: Self, n: u64) -> PageRange<Self> {
         let end = start.increment(n);
         Self::range_exclusive(start, end)
     }
 
     fn from_base_u64(addr: u64) -> Self {
-        Self::from_base_addr(A::new(addr))
+        Self::from_base_addr(Self::A::new(addr))
     }
 
     fn from_containing_u64(addr: u64) -> Self {
-        Self::from_containing_addr(A::new(addr))
+        Self::from_containing_addr(Self::A::new(addr))
     }
 
     fn as_u8_ptr(&self) -> *const u8 {
@@ -209,22 +211,16 @@ where
 }
 
 #[derive(Clone, Copy)]
-pub struct PageRange<P: Page<A> + Copy, A: Address> {
+pub struct PageRange<P: Page + Copy> {
     // Inclusive lower bound.
     start: P,
     // Exclusive upper bound.
     end: P,
-    // I kinda hate this, but I dunno how else to do it.
-    _addr_marker: PhantomData<*const A>,
 }
 
-impl<P: Page<A>, A: Address> PageRange<P, A> {
+impl<P: Page> PageRange<P> {
     pub fn new(start: P, end: P) -> Self {
-        Self {
-            start,
-            end,
-            _addr_marker: PhantomData,
-        }
+        Self { start, end }
     }
 
     pub fn first(&self) -> P {
@@ -239,7 +235,7 @@ impl<P: Page<A>, A: Address> PageRange<P, A> {
         page.base_u64() >= self.start.base_u64() && page.base_u64() < self.end.base_u64()
     }
 
-    pub fn iter(&self) -> PageRangeIter<P, A> {
+    pub fn iter(&self) -> PageRangeIter<P> {
         PageRangeIter {
             next: self.start,
             range: *self,
@@ -248,12 +244,12 @@ impl<P: Page<A>, A: Address> PageRange<P, A> {
 }
 
 #[derive(Clone, Copy)]
-pub struct PageRangeIter<P: Page<A>, A: Address> {
+pub struct PageRangeIter<P: Page> {
     next: P,
-    range: PageRange<P, A>,
+    range: PageRange<P>,
 }
 
-impl<P: Page<A>, A: Address> Iterator for PageRangeIter<P, A> {
+impl<P: Page> Iterator for PageRangeIter<P> {
     type Item = P;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -277,7 +273,9 @@ impl PhysFrame {
     }
 }
 
-impl Page<PhysAddr> for PhysFrame {
+impl Page for PhysFrame {
+    type A = PhysAddr;
+
     fn from_base_addr(addr: PhysAddr) -> Self {
         assert!(
             addr.is_aligned(PAGE_SIZE),
@@ -301,7 +299,9 @@ impl Display for PhysFrame {
 #[derive(Clone, Copy)]
 pub struct VirtPage(VirtAddr);
 
-impl Page<VirtAddr> for VirtPage {
+impl Page for VirtPage {
+    type A = VirtAddr;
+
     fn from_base_addr(addr: VirtAddr) -> Self {
         assert!(
             addr.is_aligned(PAGE_SIZE),
