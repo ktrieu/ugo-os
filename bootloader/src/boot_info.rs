@@ -1,11 +1,13 @@
 use core::{
     alloc::Layout,
+    iter::Peekable,
     mem::{align_of, size_of, MaybeUninit},
     ptr, slice,
 };
 
 use common::{
-    BootInfo, FramebufferFormat, FramebufferInfo, MemRegion, MemRegions, RegionType, BOOTINFO_START,
+    BootInfo, FramebufferFormat, FramebufferInfo, MemRegion, MemRegions, RegionType, BOOTINFO_SIZE,
+    BOOTINFO_START, PAGE_SIZE,
 };
 use uefi::{
     proto::console::gop::PixelFormat,
@@ -13,7 +15,7 @@ use uefi::{
 };
 
 use crate::{
-    addr::{Address, Page, PhysAddr, PhysFrame, VirtPage},
+    addr::{Address, Page, PageRange, PageRangeIter, PhysAddr, PhysFrame, VirtPage},
     frame::FrameAllocator,
     graphics::Framebuffer,
     mappings::{MappingFlags, Mappings},
@@ -66,6 +68,43 @@ impl BootInfoAllocator {
     }
 }
 
+// A struct for allocating pages in the BootInfo section.
+pub struct BootInfoPageAllocator {
+    iter: Peekable<PageRangeIter<VirtPage>>,
+}
+
+impl BootInfoPageAllocator {
+    pub fn new(range: PageRange<VirtPage>) -> Self {
+        Self {
+            iter: range.iter().peekable(),
+        }
+    }
+
+    pub fn alloc(&mut self) -> VirtPage {
+        match self.iter.next() {
+            Some(page) => page,
+            None => panic!("No virtual memory remaining in BootInfo section!"),
+        }
+    }
+
+    pub fn alloc_pages(&mut self, n: u64) -> PageRange<VirtPage> {
+        let first = self
+            .iter
+            .peek()
+            .copied()
+            .expect("No virtual memory remaining in BootInfo section!");
+
+        for _ in 0..n {
+            self.alloc();
+        }
+
+        let range = VirtPage::range_length(first, n);
+        // Make sure the range we return matches our inner state.
+        assert!(Some(&range.last().next()) == self.iter.peek());
+        range
+    }
+}
+
 fn new_framebuffer_info(framebuffer: &Framebuffer) -> FramebufferInfo {
     let height = framebuffer.height() as usize;
     let width = framebuffer.width() as usize;
@@ -104,32 +143,11 @@ fn new_mem_region(descriptor: &MemoryDescriptor) -> MemRegion {
     }
 }
 
-fn fixup_pointer<T>(virtual_offset: u64, pointer: *mut T) -> *mut T {
-    (pointer as u64 + virtual_offset) as *mut T
-}
-
-pub fn create_boot_info(
-    frame_allocator: &mut FrameAllocator,
-    mappings: &mut Mappings,
-    framebuffer: &Framebuffer,
+fn create_mem_regions(
     memory_map: MemoryMap,
-) -> *mut BootInfo {
-    let mut boot_info_alloc = BootInfoAllocator::new(frame_allocator);
-    let page = VirtPage::from_base_u64(BOOTINFO_START);
-
-    // Map this frame into the boot info section
-    mappings.map_page(
-        boot_info_alloc.frame(),
-        page,
-        frame_allocator,
-        MappingFlags::new_rw_data(),
-    );
-
-    // We need this later to generate virtual addresses from the physical addresses we're allocating to.
-    let virtual_offset = page.base_addr().as_u64() - boot_info_alloc.frame.base_addr().as_u64();
-
-    let framebuffer_info = new_framebuffer_info(framebuffer);
-
+    frame_allocator: &mut FrameAllocator,
+    boot_info_alloc: &mut BootInfoAllocator,
+) -> &'static mut [MaybeUninit<MemRegion>] {
     // Remember, we've split one memory map section into two for the frame allocator.
     let num_mem_regions = memory_map.entries().len() + 1;
     let mem_regions = boot_info_alloc.allocate_array::<MemRegion>(num_mem_regions);
@@ -160,11 +178,86 @@ pub fn create_boot_info(
         }
     }
 
+    mem_regions
+}
+
+fn map_framebuffer(
+    framebuffer: &Framebuffer,
+    frame_allocator: &mut FrameAllocator,
+    page_alloc: &mut BootInfoPageAllocator,
+    mappings: &mut Mappings,
+) -> PageRange<VirtPage> {
+    let framebuffer_len = framebuffer.byte_len();
+
+    let start_frame = PhysFrame::from_containing_u64(framebuffer.addr() as u64);
+    let end_frame = PhysFrame::from_containing_u64(framebuffer.addr() as u64 + framebuffer_len);
+
+    let frames = PhysFrame::range_inclusive(start_frame, end_frame);
+    bootlog!(
+        "Framebuffer: {} - {} ({} bytes, {} pages)",
+        start_frame,
+        end_frame,
+        framebuffer_len,
+        frames.len()
+    );
+    let pages = page_alloc.alloc_pages(frames.len());
+
+    bootlog!(
+        "Mapping framebuffer: {} - {} ({} pages)",
+        pages.first(),
+        pages.last(),
+        pages.len()
+    );
+    mappings.map_page_range(frames, pages, frame_allocator, MappingFlags::new_rw_data());
+
+    pages
+}
+
+fn fixup_pointer<T>(virtual_offset: u64, pointer: *mut T) -> *mut T {
+    (pointer as u64 + virtual_offset) as *mut T
+}
+
+pub fn create_boot_info(
+    frame_allocator: &mut FrameAllocator,
+    mappings: &mut Mappings,
+    framebuffer: &Framebuffer,
+    memory_map: MemoryMap,
+) -> *mut BootInfo {
+    let mut boot_info_alloc = BootInfoAllocator::new(frame_allocator);
+    let mut boot_page_alloc = BootInfoPageAllocator::new(VirtPage::range_length(
+        VirtPage::from_base_u64(BOOTINFO_START),
+        BOOTINFO_SIZE / PAGE_SIZE,
+    ));
+
+    let boot_info_page = boot_page_alloc.alloc();
+
+    // Map this frame into the boot info section
+    mappings.map_page(
+        boot_info_alloc.frame(),
+        boot_info_page,
+        frame_allocator,
+        MappingFlags::new_rw_data(),
+    );
+
+    // We need this later to generate virtual addresses from the physical addresses we're allocating to.
+    let virtual_offset =
+        boot_info_page.base_addr().as_u64() - boot_info_alloc.frame.base_addr().as_u64();
+
+    let mut framebuffer_info = new_framebuffer_info(framebuffer);
+    let framebuffer_pages =
+        map_framebuffer(framebuffer, frame_allocator, &mut boot_page_alloc, mappings);
+    let framebuffer_offset = framebuffer_pages.first().base_u64()
+        - PhysFrame::from_containing_u64(framebuffer.addr() as u64).base_u64();
+
+    framebuffer_info.address = fixup_pointer(framebuffer_offset, framebuffer.addr());
+
+    let mem_regions = create_mem_regions(memory_map, frame_allocator, &mut boot_info_alloc);
+
     let boot_info = boot_info_alloc.allocate::<BootInfo>();
     boot_info.write(BootInfo {
         mem_regions: MemRegions {
             ptr: fixup_pointer(virtual_offset, mem_regions.as_mut_ptr()) as *mut MemRegion,
-            len: num_mem_regions,
+            len: mem_regions.len(),
         },
         framebuffer: framebuffer_info,
     });

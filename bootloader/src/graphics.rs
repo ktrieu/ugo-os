@@ -116,6 +116,14 @@ impl Framebuffer {
     pub fn height(&self) -> u32 {
         self.mode.resolution().1.try_into().unwrap()
     }
+
+    pub fn byte_len(&self) -> u64 {
+        (self.stride() * BYTES_PER_PIXEL * self.height()).into()
+    }
+
+    pub fn addr(&self) -> *mut u8 {
+        self.addr
+    }
 }
 
 const FONT_SCALE: u32 = 1;
