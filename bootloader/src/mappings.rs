@@ -1,6 +1,4 @@
-use core::arch::asm;
-
-use common::{KERNEL_START, PHYSMEM_START};
+use common::PHYSMEM_START;
 use uefi::table::boot::MemoryMap;
 
 use crate::{
@@ -35,14 +33,6 @@ impl MappingFlags {
         MappingFlags {
             exec: false,
             write: true,
-            present: true,
-        }
-    }
-
-    pub fn new_r_data() -> MappingFlags {
-        MappingFlags {
-            exec: false,
-            write: false,
             present: true,
         }
     }

@@ -92,7 +92,7 @@ fn new_mem_region(descriptor: &MemoryDescriptor) -> MemRegion {
         // We're not going to need the loader code after we switch to the OS.
         MemoryType::LOADER_CODE => RegionType::Usable,
         // Ditto for boot services memory.
-        MemoryType::BOOT_SERVICES_CODE | MemoryType::BOOT_SERVICES_CODE => RegionType::Usable,
+        MemoryType::BOOT_SERVICES_CODE | MemoryType::BOOT_SERVICES_DATA => RegionType::Usable,
         // Everything else is unusable.
         _ => RegionType::Allocated,
     };
