@@ -1,6 +1,6 @@
 use uefi::{
     prelude::BootServices,
-    proto::console::gop::{GraphicsOutput, ModeInfo, PixelFormat},
+    proto::console::gop::{GraphicsOutput, Mode, ModeInfo, ModeIter, PixelFormat},
     table::boot::ScopedProtocol,
 };
 
@@ -25,22 +25,35 @@ pub enum FramebufferError {
     ModeSetFailed(uefi::Error),
 }
 
+const DESIRED_WIDTH: usize = 1080;
+const DESIRED_HEIGHT: usize = 720;
+
+fn select_mode(modes: ModeIter) -> Result<Mode, FramebufferError> {
+    let mut selected_mode: Option<Mode> = None;
+    // This is the "difference" between the best resolution, and the one we want.
+    // 0 is a perfect match.
+    let mut best_score: usize = usize::MAX;
+
+    for mode in modes {
+        let score = usize::abs_diff(mode.info().resolution().0, DESIRED_WIDTH)
+            + usize::abs_diff(mode.info().resolution().1, DESIRED_HEIGHT);
+
+        if score < best_score {
+            best_score = score;
+            selected_mode = Some(mode);
+        }
+    }
+
+    selected_mode.ok_or(FramebufferError::NoModes)
+}
+
 // We only support BGR formats, which are always 4bpp
 const BYTES_PER_PIXEL: u32 = 4;
 
 impl Framebuffer {
     pub fn new(gop: &mut ScopedProtocol<GraphicsOutput>) -> Result<Framebuffer, FramebufferError> {
         // Just grab the RGB mode with the biggest combined area
-        let selected_mode = gop
-            .modes()
-            .filter(|m| matches!(m.info().pixel_format(), PixelFormat::Bgr))
-            .max_by(|a, b| {
-                let a_area = a.info().resolution().0 * a.info().resolution().1;
-                let b_area = b.info().resolution().0 * b.info().resolution().1;
-
-                a_area.cmp(&b_area)
-            })
-            .ok_or(FramebufferError::NoModes)?;
+        let selected_mode = select_mode(gop.modes())?;
 
         gop.set_mode(&selected_mode)
             .map_err(|err| FramebufferError::ModeSetFailed(err))?;

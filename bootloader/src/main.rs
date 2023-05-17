@@ -40,6 +40,13 @@ fn init_logger(boot_services: &BootServices) {
     let mut gop = graphics::locate_gop(boot_services).expect("Failed to locate graphics protocol.");
 
     logger::logger_init(&mut gop);
+
+    let (width, height) = {
+        let framebuffer = LOGGER.try_get().unwrap().lock().framebuffer();
+        (framebuffer.width(), framebuffer.height())
+    };
+
+    bootlog!("Selected video mode ({}x{})", width, height);
 }
 
 fn read_kernel_file(boot_services: &BootServices) -> &'static [u8] {
