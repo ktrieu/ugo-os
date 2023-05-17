@@ -197,14 +197,6 @@ impl TextFramebuffer {
         }
     }
 
-    pub fn line_length(&self) -> usize {
-        self.line_length
-    }
-
-    pub fn lines(&self) -> usize {
-        self.lines
-    }
-
     pub fn put_char(&mut self, pos: CharPos, c: char) {
         let (pixel_x, pixel_y) = self
             .pixel_coords(pos)
