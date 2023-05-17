@@ -3,15 +3,10 @@
 
 use core::{arch::asm, fmt::Write, panic::PanicInfo};
 
-use common::{BootInfo, PAGE_SIZE};
-use framebuffer::{CharPos, Color, Framebuffer, TextFramebuffer};
+use common::BootInfo;
+use framebuffer::TextFramebuffer;
 
 mod framebuffer;
-
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
-}
 
 // Real fast: let's try and get something on the serial port. This code is Very Bad.
 fn outb(port: u16, byte: u8) {
@@ -61,6 +56,14 @@ impl core::fmt::Write for SerialConsole {
     }
 }
 
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    let mut c = SerialConsole {};
+    write!(c, "{}", info).unwrap();
+
+    loop {}
+}
+
 #[no_mangle]
 pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     outb(COM1 + 1, 0x00); // Disable all interrupts
@@ -74,30 +77,13 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     outb(COM1 + 0, 0xAE);
     outb(COM1 + 4, 0x0F);
 
-    let mut console = SerialConsole {};
-
-    for region in &*boot_info.mem_regions {
-        let ty_code = match region.ty {
-            common::RegionType::Usable => 'U',
-            common::RegionType::Allocated => 'A',
-            common::RegionType::Bootloader => 'B',
-        };
-        write!(
-            console,
-            "{}: {} pages ({:#016x} - {:#016x})\r\n",
-            ty_code,
-            region.pages,
-            region.start,
-            region.start + (region.pages * PAGE_SIZE)
-        )
-        .unwrap();
-    }
-
     let mut text_fb = TextFramebuffer::new(&boot_info.framebuffer);
     text_fb.clear();
 
-    for (idx, c) in ('A'..='Z').enumerate() {
-        text_fb.write_char(CharPos(0, idx), c);
+    for c in ('A'..'Z').cycle() {
+        for _ in 0..text_fb.line_length() {
+            text_fb.write_char(c);
+        }
     }
 
     loop {}
