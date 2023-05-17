@@ -28,9 +28,9 @@ fn inb(port: u16) -> u8 {
     let mut ret: u8;
     unsafe {
         asm!(
-            "in {ret}, dx",
+            "in al, dx",
+            out("al") ret,
             in("dx") port,
-            ret = out(reg_byte) ret,
         );
     }
 
