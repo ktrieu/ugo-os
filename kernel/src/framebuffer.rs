@@ -282,3 +282,13 @@ impl TextFramebuffer {
         }
     }
 }
+
+impl core::fmt::Write for TextFramebuffer {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        self.write_text(s);
+
+        Ok(())
+    }
+}
+
+unsafe impl Send for TextFramebuffer {}
