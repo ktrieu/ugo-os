@@ -1,9 +1,12 @@
 #![no_std]
 #![no_main]
 
-use core::{arch::asm, fmt::Write, panic::PanicInfo, ptr};
+use core::{arch::asm, fmt::Write, panic::PanicInfo};
 
-use common::{BootInfo, FramebufferInfo, PAGE_SIZE};
+use common::{BootInfo, PAGE_SIZE};
+use framebuffer::{Color, Framebuffer};
+
+mod framebuffer;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
@@ -58,22 +61,6 @@ impl core::fmt::Write for SerialConsole {
     }
 }
 
-const BPP: usize = 4;
-
-fn clear_framebuffer(fb: &FramebufferInfo) {
-    for x in 0..fb.width {
-        for y in 0..fb.height {
-            let pixel_ptr = fb.address.wrapping_add((y * fb.stride * BPP) + x * BPP);
-            unsafe {
-                ptr::write_volatile(pixel_ptr, 0);
-                ptr::write_volatile(pixel_ptr.add(1), 0);
-                ptr::write_volatile(pixel_ptr.add(2), 0);
-                ptr::write_volatile(pixel_ptr.add(3), 0);
-            }
-        }
-    }
-}
-
 #[no_mangle]
 pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     outb(COM1 + 1, 0x00); // Disable all interrupts
@@ -106,7 +93,8 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
         .unwrap();
     }
 
-    clear_framebuffer(&boot_info.framebuffer);
+    let mut framebuffer = Framebuffer::new(&boot_info.framebuffer);
+    framebuffer.clear(Color::BLACK);
 
     loop {}
 }

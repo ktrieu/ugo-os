@@ -67,6 +67,7 @@ impl ops::DerefMut for MemRegions {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub enum FramebufferFormat {
     Bgr,
 }
