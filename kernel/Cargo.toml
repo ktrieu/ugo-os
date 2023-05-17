@@ -13,6 +13,7 @@ edition = "2021"
 
 [dependencies]
 common = { path = "../common" }
+noto-sans-mono-bitmap = "0.2.0"
 
 [build-dependencies]
 common = { path = "../common" }

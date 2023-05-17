@@ -4,7 +4,7 @@
 use core::{arch::asm, fmt::Write, panic::PanicInfo};
 
 use common::{BootInfo, PAGE_SIZE};
-use framebuffer::{Color, Framebuffer};
+use framebuffer::{CharPos, Color, Framebuffer, TextFramebuffer};
 
 mod framebuffer;
 
@@ -93,8 +93,12 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
         .unwrap();
     }
 
-    let mut framebuffer = Framebuffer::new(&boot_info.framebuffer);
-    framebuffer.clear(Color::BLACK);
+    let mut text_fb = TextFramebuffer::new(&boot_info.framebuffer);
+    text_fb.clear();
+
+    for (idx, c) in ('A'..='Z').enumerate() {
+        text_fb.write_char(CharPos(0, idx), c);
+    }
 
     loop {}
 }

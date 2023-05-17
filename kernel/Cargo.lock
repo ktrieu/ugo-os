@@ -11,4 +11,11 @@ name = "kernel"
 version = "0.1.0"
 dependencies = [
  "common",
+ "noto-sans-mono-bitmap",
 ]
+
+[[package]]
+name = "noto-sans-mono-bitmap"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a27daf9557165efe1d09b52f97393bf6283cadb0a76fbe64a1061e15553a994a"
