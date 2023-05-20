@@ -91,10 +91,12 @@ impl<'a> Loader<'a> {
             // If the zeroed section isn't aligned, we have to copy the last non-zero frame to a new frame
             // then zero the required memory. This is because the part of the frame in the file that should be zeroed
             // almost certainly contains other data.
-            let src_frame = PhysFrame::from_containing_u64(
-                self.kernel_phys_offset.as_u64() + phdr.offset() + zeroed_start,
-            );
+            let copy_src = PhysAddr::new(self.kernel_phys_offset.as_u64() + phdr.offset());
+            let src_frame = PhysFrame::from_containing_addr(copy_src);
+            let src_offset_in_frame = copy_src.as_u64() - src_frame.base_u64();
+
             let dst_frame = allocator.alloc_frame();
+            let copy_dst = PhysAddr::new(dst_frame.base_u64() + src_offset_in_frame);
 
             // Zero our frame.
             // Safety: Since dst_frame is a fresh page, it's aligned and clear to write a page of zeroes to.
@@ -109,11 +111,12 @@ impl<'a> Loader<'a> {
             // from free memory via FrameAllocator.
             unsafe {
                 copy_nonoverlapping(
-                    src_frame.as_u8_ptr(),
-                    dst_frame.as_u8_ptr_mut(),
+                    copy_src.as_u8_ptr(),
+                    copy_dst.as_u8_ptr_mut(),
                     bytes_to_copy as usize,
                 )
             }
+
             // And map it in.
             let pages_to_zeroed_start = align_down(zeroed_start, PAGE_SIZE) / PAGE_SIZE;
             let page =
@@ -129,20 +132,22 @@ impl<'a> Loader<'a> {
 
         // Since we've handled the unaligned case above, we can now align the address up and deal with the remaining pages.
         let zeroed_start = align_up(phdr.file_size(), PAGE_SIZE);
-        let zero_bytes = phdr.mem_size() - zeroed_start;
-        let pages_to_map = align_up(zero_bytes, PAGE_SIZE) / PAGE_SIZE;
+        if phdr.mem_size() > zeroed_start {
+            let zero_bytes = phdr.mem_size() - zeroed_start;
+            let pages_to_map = align_up(zero_bytes, PAGE_SIZE) / PAGE_SIZE;
 
-        let start_page = VirtPage::from_containing_u64(phdr.virtual_addr());
-        let pages = VirtPage::range_length(start_page, pages_to_map);
+            let start_page = VirtPage::from_containing_u64(phdr.virtual_addr() + zeroed_start);
+            let pages = VirtPage::range_length(start_page, pages_to_map);
 
-        let frames =
-            mappings.alloc_and_map_range(pages, allocator, phdr_flags_to_mappings_flags(phdr));
+            let frames =
+                mappings.alloc_and_map_range(pages, allocator, phdr_flags_to_mappings_flags(phdr));
 
-        for frame in frames.iter() {
-            // Zero the frames we allocated.
-            // Safety: Since dst_frame is a fresh page, it's aligned and clear to write a page of zeroes to.
-            unsafe {
-                write_bytes(frame.as_u8_ptr_mut(), 0, PAGE_SIZE as usize);
+            for frame in frames.iter() {
+                // Zero the frames we allocated.
+                // Safety: Since dst_frame is a fresh page, it's aligned and clear to write a page of zeroes to.
+                unsafe {
+                    write_bytes(frame.as_u8_ptr_mut(), 0, PAGE_SIZE as usize);
+                }
             }
         }
 
