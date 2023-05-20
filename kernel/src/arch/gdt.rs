@@ -1,23 +1,16 @@
-use core::arch::asm;
+use core::arch::{asm, global_asm};
 
 use bilge::prelude::*;
 use conquer_once::spin::OnceCell;
 use spin::Mutex;
+
+use super::PrivilegeLevel;
 
 #[bitsize(1)]
 #[derive(FromBits)]
 pub enum DescriptorType {
     System = 0,
     CodeStack = 1,
-}
-
-#[bitsize(2)]
-#[derive(FromBits)]
-pub enum PrivilegeLevel {
-    Kernel = 0,
-    Level1,
-    Level2,
-    User = 3,
 }
 
 #[bitsize(1)]
@@ -28,13 +21,14 @@ pub enum SegmentType {
 }
 
 #[bitsize(64)]
+#[derive(Clone, Copy, FromBits)]
 pub struct GdtEntry {
     limit_low: u16,
     address_low: u24,
     accessed: bool,
     // Allows read for code segments, and write for data segments.
     read_write: bool,
-    expand_down: bool,
+    dc_flag: bool,
     ty: SegmentType,
     descriptor_type: DescriptorType,
     privilege_level: PrivilegeLevel,
@@ -47,43 +41,26 @@ pub struct GdtEntry {
     address_high: u8,
 }
 
-impl Default for GdtEntry {
-    fn default() -> Self {
-        GdtEntry::new(
-            // Set base/limit to zero. These are ignored in x64 anyway.
-            0,
-            u24::new(0),
-            // The system will set accessed, and it's recommended that we set it to false.
-            false,
-            // This allows code segments to be read, and data segments to be written. Default this to true.
-            false,
-            // Allows segments to "expand down". We set these to full size anyway, so set this to false.
-            false,
-            // Calling code will set these, so just set these to any value.
-            SegmentType::Code,
-            DescriptorType::CodeStack,
-            PrivilegeLevel::Kernel,
-            // Just set present to false, the rest doesn't really matter.
-            false,
-            // Set base/limit to zero.
-            u4::new(0),
-            // This is available for our use. The value doesn't matter.
-            false,
-            // Set every segment to 64-bit.
-            true,
-            // Set code/stack segments to use 32 bit addresses. Probably meaningless in x64?
-            true,
-            // Set the segment limit to not use a 4096 byte granularity. Surely this doesn't matter either.
-            false,
-            // Set the limit register to zero.
-            0,
-        )
-    }
-}
-
 impl GdtEntry {
-    pub fn new_kernel_code_segment() -> Self {
+    const LENGTH_BITS: usize = 64;
+    const LENGTH_BYTES: usize = 8;
+
+    // I would like to implement this as the Default trait, but I need this to be const as well.
+    pub const fn default() -> Self {
+        GdtEntry { value: 0 }
+    }
+
+    pub fn new_64_bit_segment() -> Self {
         let mut entry = Self::default();
+
+        entry.set_is_64_bit(true);
+        entry.set_present(true);
+
+        entry
+    }
+
+    pub fn new_kernel_code_segment() -> Self {
+        let mut entry = Self::new_64_bit_segment();
 
         entry.set_descriptor_type(DescriptorType::CodeStack);
         entry.set_ty(SegmentType::Code);
@@ -93,7 +70,7 @@ impl GdtEntry {
     }
 
     pub fn new_kernel_stack_segment() -> Self {
-        let mut entry = Self::default();
+        let mut entry = Self::new_64_bit_segment();
 
         entry.set_descriptor_type(DescriptorType::CodeStack);
         entry.set_ty(SegmentType::Stack);
@@ -101,45 +78,110 @@ impl GdtEntry {
 
         entry
     }
+
+    pub fn new_user_code_segment() -> Self {
+        let mut entry = Self::new_64_bit_segment();
+
+        entry.set_descriptor_type(DescriptorType::CodeStack);
+        entry.set_ty(SegmentType::Code);
+        entry.set_privilege_level(PrivilegeLevel::User);
+
+        entry
+    }
+
+    pub fn new_user_stack_segment() -> Self {
+        let mut entry = Self::new_64_bit_segment();
+
+        entry.set_descriptor_type(DescriptorType::CodeStack);
+        entry.set_ty(SegmentType::Stack);
+        entry.set_privilege_level(PrivilegeLevel::User);
+
+        entry
+    }
 }
 
-const GDT_LENGTH: usize = 3;
-
-type GdtStatic = OnceCell<Mutex<[GdtEntry; GDT_LENGTH]>>;
-static GDT: GdtStatic = OnceCell::uninit();
-
-#[repr(packed)]
-// We read from these via the LGDT instruction, but Rust doesn't know that.
-#[allow(dead_code)]
 struct GdtBase {
     length: u16,
     address: u64,
 }
 
-pub fn initialize_gdt() {
-    // Avoid double initializing.
-    assert!(!GDT.is_initialized());
+#[repr(transparent)]
+pub struct Gdt {
+    entries: [GdtEntry; Gdt::LENGTH],
+}
 
-    GDT.init_once(|| {
-        // Important: the first entry needs to be null.
-        let entries = [
-            GdtEntry::default(),
-            GdtEntry::new_kernel_code_segment(),
-            GdtEntry::new_kernel_stack_segment(),
-        ];
+global_asm!(
+    "
+    lgdt [rax]
+    push 0x08
+    push [rip + 2f]
+    retfq
+2:
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+    ",
+);
 
-        Mutex::new(entries)
-    });
+extern "C" {
+    fn load_gdt_asm(gdt_base: u64);
+}
 
-    let base = GdtBase {
-        length: GDT_LENGTH as u16 * 32,
-        address: (&GDT as *const GdtStatic) as u64,
-    };
+impl Gdt {
+    // Four user/kernel code/stack segments, plus the requisite null first entry.
+    const LENGTH: usize = 5;
 
-    unsafe {
-        asm!(
-            "lgdt [{ptr}]",
-            ptr = in(reg) &base
-        );
+    const KERNEL_CODE_SEGMENT_IDX: usize = 1;
+    const KERNEL_DATA_SEGMENT_IDX: usize = 2;
+    const USER_CODE_SEGMENT_IDX: usize = 3;
+    const USER_DATA_SEGMENT_IDX: usize = 4;
+
+    pub fn initialize(&mut self) {
+        self.entries[Self::KERNEL_CODE_SEGMENT_IDX] = GdtEntry::new_kernel_code_segment();
+        self.entries[Self::KERNEL_DATA_SEGMENT_IDX] = GdtEntry::new_kernel_stack_segment();
+        self.entries[Self::USER_CODE_SEGMENT_IDX] = GdtEntry::new_user_code_segment();
+        self.entries[Self::USER_DATA_SEGMENT_IDX] = GdtEntry::new_user_stack_segment();
     }
+
+    // Safety: The GDT this points to must be initialized with valid kernel code/data segments before calling this function.
+    pub unsafe fn activate(&self) {
+        let length: u16 = (Self::LENGTH * GdtEntry::LENGTH_BITS)
+            .try_into()
+            .expect("GDT length couldn't fit into a u16");
+        let base = GdtBase {
+            address: &self.entries as *const GdtEntry as u64,
+            length,
+        };
+
+        asm!(
+            "
+            lgdt [{base}]
+            push 0x08
+            push [rip + 2f]
+            retfq
+            2:
+            mov ax, 0x10
+            mov ds, ax
+            mov es, ax
+            mov fs, ax
+            mov gs, ax
+            mov ss, ax
+            ",
+            base = in(reg) &base
+        )
+    }
+}
+
+static GDT: Mutex<Gdt> = Mutex::new(Gdt {
+    entries: [GdtEntry::default(); Gdt::LENGTH],
+});
+
+pub fn initialize_gdt() {
+    GDT.lock().initialize();
+
+    // Safety: We have initialized the GDT.
+    unsafe { GDT.lock().activate() }
 }
