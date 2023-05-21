@@ -1,7 +1,6 @@
-use core::arch::{asm, global_asm};
+use core::arch::asm;
 
 use bilge::prelude::*;
-use conquer_once::spin::OnceCell;
 use spin::Mutex;
 
 use super::PrivilegeLevel;
@@ -16,8 +15,8 @@ pub enum DescriptorType {
 #[bitsize(1)]
 #[derive(FromBits)]
 pub enum SegmentType {
-    Code,
-    Stack,
+    Stack = 0,
+    Code = 1,
 }
 
 #[bitsize(64)]
@@ -35,7 +34,7 @@ pub struct GdtEntry {
     present: bool,
     limit_high: u4,
     available: bool,
-    is_64_bit: bool,
+    is_64_bit_code: bool,
     use_32_bit_addresses: bool,
     is_limit_granular: bool,
     address_high: u8,
@@ -43,7 +42,6 @@ pub struct GdtEntry {
 
 impl GdtEntry {
     const LENGTH_BITS: usize = 64;
-    const LENGTH_BYTES: usize = 8;
 
     // I would like to implement this as the Default trait, but I need this to be const as well.
     pub const fn default() -> Self {
@@ -53,7 +51,6 @@ impl GdtEntry {
     pub fn new_64_bit_segment() -> Self {
         let mut entry = Self::default();
 
-        entry.set_is_64_bit(true);
         entry.set_present(true);
 
         entry
@@ -65,6 +62,7 @@ impl GdtEntry {
         entry.set_descriptor_type(DescriptorType::CodeStack);
         entry.set_ty(SegmentType::Code);
         entry.set_privilege_level(PrivilegeLevel::Kernel);
+        entry.set_is_64_bit_code(true);
 
         entry
     }
@@ -85,6 +83,7 @@ impl GdtEntry {
         entry.set_descriptor_type(DescriptorType::CodeStack);
         entry.set_ty(SegmentType::Code);
         entry.set_privilege_level(PrivilegeLevel::User);
+        entry.set_is_64_bit_code(true);
 
         entry
     }
@@ -100,6 +99,8 @@ impl GdtEntry {
     }
 }
 
+// The LGDT instruction reads these fields, but Rust doesn't know that.
+#[allow(dead_code)]
 struct GdtBase {
     length: u16,
     address: u64,
@@ -108,26 +109,6 @@ struct GdtBase {
 #[repr(transparent)]
 pub struct Gdt {
     entries: [GdtEntry; Gdt::LENGTH],
-}
-
-global_asm!(
-    "
-    lgdt [rax]
-    push 0x08
-    push [rip + 2f]
-    retfq
-2:
-    mov ax, 0x10
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov ss, ax
-    ",
-);
-
-extern "C" {
-    fn load_gdt_asm(gdt_base: u64);
 }
 
 impl Gdt {
@@ -159,8 +140,10 @@ impl Gdt {
         asm!(
             "
             lgdt [{base}]
-            push 0x08
-            push [rip + 2f]
+            mov rax, 0x08
+            push rax
+            lea rax, [rip + 2f]
+            push rax
             retfq
             2:
             mov ax, 0x10
