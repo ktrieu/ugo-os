@@ -36,12 +36,12 @@ pub struct GdtEntry {
     available: bool,
     is_64_bit_code: bool,
     use_32_bit_addresses: bool,
-    is_limit_granular: bool,
+    is_limit_page_granular: bool,
     address_high: u8,
 }
 
 impl GdtEntry {
-    const LENGTH_BITS: usize = 64;
+    const LENGTH_BYTES: usize = 8;
 
     // I would like to implement this as the Default trait, but I need this to be const as well.
     pub const fn default() -> Self {
@@ -72,6 +72,7 @@ impl GdtEntry {
 
         entry.set_descriptor_type(DescriptorType::CodeStack);
         entry.set_ty(SegmentType::Stack);
+        entry.set_read_write(true);
         entry.set_privilege_level(PrivilegeLevel::Kernel);
 
         entry
@@ -93,6 +94,7 @@ impl GdtEntry {
 
         entry.set_descriptor_type(DescriptorType::CodeStack);
         entry.set_ty(SegmentType::Stack);
+        entry.set_read_write(true);
         entry.set_privilege_level(PrivilegeLevel::User);
 
         entry
@@ -101,6 +103,7 @@ impl GdtEntry {
 
 // The LGDT instruction reads these fields, but Rust doesn't know that.
 #[allow(dead_code)]
+#[repr(packed)]
 struct GdtBase {
     length: u16,
     address: u64,
@@ -129,7 +132,7 @@ impl Gdt {
 
     // Safety: The GDT this points to must be initialized with valid kernel code/data segments before calling this function.
     pub unsafe fn activate(&self) {
-        let length: u16 = (Self::LENGTH * GdtEntry::LENGTH_BITS)
+        let length: u16 = (Self::LENGTH * GdtEntry::LENGTH_BYTES - 1)
             .try_into()
             .expect("GDT length couldn't fit into a u16");
         let base = GdtBase {
