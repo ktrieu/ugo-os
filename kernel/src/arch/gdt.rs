@@ -9,13 +9,14 @@ use super::PrivilegeLevel;
 #[derive(FromBits)]
 pub enum DescriptorType {
     System = 0,
-    CodeStack = 1,
+    // This is a code/data segment for application use.
+    NonSystem = 1,
 }
 
 #[bitsize(1)]
 #[derive(FromBits)]
 pub enum SegmentType {
-    Stack = 0,
+    Data = 0,
     Code = 1,
 }
 
@@ -59,7 +60,7 @@ impl GdtEntry {
     pub fn new_kernel_code_segment() -> Self {
         let mut entry = Self::new_64_bit_segment();
 
-        entry.set_descriptor_type(DescriptorType::CodeStack);
+        entry.set_descriptor_type(DescriptorType::NonSystem);
         entry.set_ty(SegmentType::Code);
         entry.set_privilege_level(PrivilegeLevel::Kernel);
         entry.set_is_64_bit_code(true);
@@ -67,11 +68,11 @@ impl GdtEntry {
         entry
     }
 
-    pub fn new_kernel_stack_segment() -> Self {
+    pub fn new_kernel_data_segment() -> Self {
         let mut entry = Self::new_64_bit_segment();
 
-        entry.set_descriptor_type(DescriptorType::CodeStack);
-        entry.set_ty(SegmentType::Stack);
+        entry.set_descriptor_type(DescriptorType::NonSystem);
+        entry.set_ty(SegmentType::Data);
         entry.set_read_write(true);
         entry.set_privilege_level(PrivilegeLevel::Kernel);
 
@@ -81,7 +82,7 @@ impl GdtEntry {
     pub fn new_user_code_segment() -> Self {
         let mut entry = Self::new_64_bit_segment();
 
-        entry.set_descriptor_type(DescriptorType::CodeStack);
+        entry.set_descriptor_type(DescriptorType::NonSystem);
         entry.set_ty(SegmentType::Code);
         entry.set_privilege_level(PrivilegeLevel::User);
         entry.set_is_64_bit_code(true);
@@ -89,11 +90,11 @@ impl GdtEntry {
         entry
     }
 
-    pub fn new_user_stack_segment() -> Self {
+    pub fn new_user_data_segment() -> Self {
         let mut entry = Self::new_64_bit_segment();
 
-        entry.set_descriptor_type(DescriptorType::CodeStack);
-        entry.set_ty(SegmentType::Stack);
+        entry.set_descriptor_type(DescriptorType::NonSystem);
+        entry.set_ty(SegmentType::Data);
         entry.set_read_write(true);
         entry.set_privilege_level(PrivilegeLevel::User);
 
@@ -115,7 +116,7 @@ pub struct Gdt {
 }
 
 impl Gdt {
-    // Four user/kernel code/stack segments, plus the requisite null first entry.
+    // Four user/kernel code/data segments, plus the requisite null first entry.
     const LENGTH: usize = 5;
 
     const KERNEL_CODE_SEGMENT_IDX: usize = 1;
@@ -125,9 +126,9 @@ impl Gdt {
 
     pub fn initialize(&mut self) {
         self.entries[Self::KERNEL_CODE_SEGMENT_IDX] = GdtEntry::new_kernel_code_segment();
-        self.entries[Self::KERNEL_DATA_SEGMENT_IDX] = GdtEntry::new_kernel_stack_segment();
+        self.entries[Self::KERNEL_DATA_SEGMENT_IDX] = GdtEntry::new_kernel_data_segment();
         self.entries[Self::USER_CODE_SEGMENT_IDX] = GdtEntry::new_user_code_segment();
-        self.entries[Self::USER_DATA_SEGMENT_IDX] = GdtEntry::new_user_stack_segment();
+        self.entries[Self::USER_DATA_SEGMENT_IDX] = GdtEntry::new_user_data_segment();
     }
 
     // Safety: The GDT this points to must be initialized with valid kernel code/data segments before calling this function.
