@@ -1,7 +1,7 @@
 use bilge::prelude::*;
 use spin::Mutex;
 
-use crate::arch::PrivilegeLevel;
+use crate::arch::{gdt::SegmentSelector, PrivilegeLevel};
 
 use super::handler::ExceptionFrame;
 
@@ -10,21 +10,6 @@ use super::handler::ExceptionFrame;
 pub enum GateType {
     Interrupt = 0b1110,
     Trap = 0b1111,
-}
-
-#[bitsize(1)]
-#[derive(FromBits)]
-pub enum SelectorTarget {
-    Global = 0,
-    Local = 1,
-}
-
-#[bitsize(16)]
-#[derive(FromBits)]
-pub struct SegmentSelector {
-    privilege_level: PrivilegeLevel,
-    target: SelectorTarget,
-    index: u13,
 }
 
 #[bitsize(128)]
