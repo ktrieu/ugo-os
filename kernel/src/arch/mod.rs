@@ -1,7 +1,7 @@
 use bilge::prelude::*;
 
 pub mod gdt;
-pub mod idt;
+pub mod interrupts;
 
 #[bitsize(2)]
 #[derive(Clone, Copy, FromBits)]
