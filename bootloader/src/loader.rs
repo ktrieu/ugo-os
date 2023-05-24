@@ -85,15 +85,16 @@ impl<'a> Loader<'a> {
         mappings: &mut Mappings,
         allocator: &mut FrameAllocator,
     ) -> LoaderResult<()> {
-        let zeroed_start = phdr.file_size();
+        let phdr_phys_start = PhysAddr::new(self.kernel_phys_offset.as_u64() + phdr.offset());
+        let virtual_offset = phdr.virtual_addr() - phdr_phys_start.as_u64();
+        let zero_mem_start = PhysAddr::new(phdr_phys_start.as_u64() + phdr.file_size());
 
-        if !is_aligned(zeroed_start, PAGE_SIZE) {
+        if !is_aligned(zero_mem_start.as_u64(), PAGE_SIZE) {
             // If the zeroed section isn't aligned, we have to copy the last non-zero frame to a new frame
             // then zero the required memory. This is because the part of the frame in the file that should be zeroed
             // almost certainly contains other data.
-            let copy_src = PhysAddr::new(self.kernel_phys_offset.as_u64() + phdr.offset());
-            let src_frame = PhysFrame::from_containing_addr(copy_src);
-            let src_offset_in_frame = copy_src.as_u64() - src_frame.base_u64();
+            let src_frame = PhysFrame::from_containing_addr(zero_mem_start);
+            let src_offset_in_frame = phdr_phys_start.as_u64() - src_frame.base_u64();
 
             let dst_frame = allocator.alloc_frame();
             let copy_dst = PhysAddr::new(dst_frame.base_u64() + src_offset_in_frame);
@@ -104,40 +105,36 @@ impl<'a> Loader<'a> {
                 write_bytes(dst_frame.as_u8_ptr_mut(), 0, PAGE_SIZE as usize);
             }
 
-            // We need to copy whatever's left after the last page boundary.
-            let bytes_to_copy = zeroed_start - (align_down(zeroed_start, PAGE_SIZE));
+            // We need to copy from the src_offset to the end of the non-zeroed data.
+            let bytes_to_copy = zero_mem_start.as_u64() - phdr_phys_start.as_u64();
 
             // Safety: src_frame and dst_frame are guaranteed to not overlap, since dst_frame is freshly allocated
             // from free memory via FrameAllocator.
             unsafe {
                 copy_nonoverlapping(
-                    copy_src.as_u8_ptr(),
+                    phdr_phys_start.as_u8_ptr(),
                     copy_dst.as_u8_ptr_mut(),
                     bytes_to_copy as usize,
                 )
             }
 
-            // And map it in.
-            let pages_to_zeroed_start = align_down(zeroed_start, PAGE_SIZE) / PAGE_SIZE;
-            let page =
-                VirtPage::from_containing_u64(phdr.virtual_addr()).increment(pages_to_zeroed_start);
+            let virtual_address = VirtAddr::new(zero_mem_start.as_u64() + virtual_offset);
 
             mappings.map_page(
                 dst_frame,
-                page,
+                VirtPage::from_containing_addr(virtual_address),
                 allocator,
                 phdr_flags_to_mappings_flags(phdr),
             );
         };
 
         // Since we've handled the unaligned case above, we can now align the address up and deal with the remaining pages.
-        let zeroed_start = align_up(phdr.file_size(), PAGE_SIZE);
-        if phdr.mem_size() > zeroed_start {
-            let zero_bytes = phdr.mem_size() - zeroed_start;
-            let pages_to_map = align_up(zero_bytes, PAGE_SIZE) / PAGE_SIZE;
-
-            let start_page = VirtPage::from_containing_u64(phdr.virtual_addr() + zeroed_start);
-            let pages = VirtPage::range_length(start_page, pages_to_map);
+        let zero_mem_start = zero_mem_start.align_up(PAGE_SIZE);
+        if phdr_phys_start.as_u64() + phdr.mem_size() > zero_mem_start.as_u64() {
+            // We just aligned this, so this is a base address.
+            let start_page = VirtPage::from_base_u64(zero_mem_start.as_u64() + virtual_offset);
+            let end_page = VirtPage::from_containing_u64(phdr.virtual_addr() + phdr.mem_size());
+            let pages = VirtPage::range_inclusive(start_page, end_page);
 
             let frames =
                 mappings.alloc_and_map_range(pages, allocator, phdr_flags_to_mappings_flags(phdr));
