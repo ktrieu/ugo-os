@@ -20,6 +20,14 @@ pub struct SegmentSelector {
     index: u13,
 }
 
+impl SegmentSelector {
+    pub fn new_global(privilege: PrivilegeLevel, entry_idx: u16) -> Self {
+        // The three lower bits are used for flags, so shift the index we're passed to accomodate.
+        let index = entry_idx >> 3;
+        SegmentSelector::new(privilege, SelectorTarget::Global, u13::new(index))
+    }
+}
+
 #[bitsize(1)]
 #[derive(FromBits)]
 pub enum DescriptorType {
@@ -144,6 +152,13 @@ impl Gdt {
         self.entries[Self::KERNEL_DATA_SEGMENT_IDX] = GdtEntry::new_kernel_data_segment();
         self.entries[Self::USER_CODE_SEGMENT_IDX] = GdtEntry::new_user_code_segment();
         self.entries[Self::USER_DATA_SEGMENT_IDX] = GdtEntry::new_user_data_segment();
+    }
+
+    pub fn get_kernel_code_selector() -> SegmentSelector {
+        SegmentSelector::new_global(
+            PrivilegeLevel::Kernel,
+            Self::KERNEL_CODE_SEGMENT_IDX.try_into().unwrap(),
+        )
     }
 
     // Safety: The GDT this points to must be initialized with valid kernel code/data segments before calling this function.

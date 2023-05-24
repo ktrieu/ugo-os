@@ -1,7 +1,12 @@
+use core::arch::asm;
+
 use bilge::prelude::*;
 use spin::Mutex;
 
-use crate::arch::{gdt::SegmentSelector, PrivilegeLevel};
+use crate::arch::{
+    gdt::{Gdt, SegmentSelector},
+    PrivilegeLevel,
+};
 
 use super::handler::ExceptionFrame;
 
@@ -47,12 +52,13 @@ impl IdtEntryBase {
     fn set_handler(&mut self, address: u64) {
         self.set_address(address);
         self.set_gate_type(GateType::Interrupt);
+        self.set_selector(Gdt::get_kernel_code_selector());
         self.set_present(true);
     }
 }
 
-type IdtHandler = fn(ExceptionFrame);
-type IdtHandlerWithErrorCode = fn(ExceptionFrame, error_code: u64);
+type IdtHandler = extern "x86-interrupt" fn(ExceptionFrame);
+type IdtHandlerWithErrorCode = extern "x86-interrupt" fn(ExceptionFrame, error_code: u64);
 
 // Wrapper types so we can ensure we register the correct handlers at compile time.
 #[repr(transparent)]
@@ -86,36 +92,42 @@ impl IdtEntry {
 }
 
 #[repr(packed)]
+pub struct IdtBase {
+    limit: u16,
+    address: u64,
+}
+
+#[repr(packed)]
 pub struct Idt {
-    div_zero: IdtEntry,
-    debug: IdtEntry,
-    nmi: IdtEntry,
-    breakpoint: IdtEntry,
-    overflow: IdtEntry,
-    bound: IdtEntry,
-    invalid_opcode: IdtEntry,
-    device_not_available: IdtEntry,
-    double_fault: IdtEntryWithErrorCode,
-    coprocessor_overrun: IdtEntry,
-    invalid_tss: IdtEntryWithErrorCode,
-    segment_not_present: IdtEntryWithErrorCode,
-    stack_fault: IdtEntryWithErrorCode,
-    general_protection: IdtEntryWithErrorCode,
-    page_fault: IdtEntryWithErrorCode,
-    floating_point_error: IdtEntry,
-    alignment_check: IdtEntryWithErrorCode,
-    machine_check: IdtEntry,
-    simd_floating_point: IdtEntry,
-    virtualization: IdtEntry,
+    pub div_zero: IdtEntry,
+    pub debug: IdtEntry,
+    pub nmi: IdtEntry,
+    pub breakpoint: IdtEntry,
+    pub overflow: IdtEntry,
+    pub bound: IdtEntry,
+    pub invalid_opcode: IdtEntry,
+    pub device_not_available: IdtEntry,
+    pub double_fault: IdtEntryWithErrorCode,
+    pub coprocessor_overrun: IdtEntry,
+    pub invalid_tss: IdtEntryWithErrorCode,
+    pub segment_not_present: IdtEntryWithErrorCode,
+    pub stack_fault: IdtEntryWithErrorCode,
+    pub general_protection: IdtEntryWithErrorCode,
+    pub page_fault: IdtEntryWithErrorCode,
+    pub floating_point_error: IdtEntry,
+    pub alignment_check: IdtEntryWithErrorCode,
+    pub machine_check: IdtEntry,
+    pub simd_floating_point: IdtEntry,
+    pub virtualization: IdtEntry,
     // Interrupts 32 - 255 are user defined and have no error codes.
-    user_defined: [IdtEntry; Self::NUM_USER_DEFINED],
+    pub user_defined: [IdtEntry; Self::NUM_USER_DEFINED as usize],
 }
 
 impl Idt {
-    const NUM_ENTRIES: usize = 255;
-    const USER_DEFINED_START: usize = 32;
+    const NUM_ENTRIES: u16 = 255;
+    const USER_DEFINED_START: u16 = 32;
 
-    const NUM_USER_DEFINED: usize = Self::NUM_ENTRIES - Self::USER_DEFINED_START;
+    const NUM_USER_DEFINED: u16 = Self::NUM_ENTRIES - Self::USER_DEFINED_START;
 
     pub const fn default() -> Self {
         Self {
@@ -139,11 +151,39 @@ impl Idt {
             machine_check: IdtEntry::default(),
             simd_floating_point: IdtEntry::default(),
             virtualization: IdtEntry::default(),
-            user_defined: [IdtEntry::default(); Self::NUM_USER_DEFINED],
+            user_defined: [IdtEntry::default(); Self::NUM_USER_DEFINED as usize],
         }
+    }
+
+    // Safety: This IDT must be in a valid format.
+    pub unsafe fn activate(&self) {
+        let limit = (Idt::NUM_ENTRIES * IdtEntryBase::LENGTH_BYTES) - 1;
+        let base = IdtBase {
+            limit: limit.try_into().unwrap(),
+            // Our fields are packed, so our base address should be the same as
+            // the start of the table
+            address: self as *const Idt as u64,
+        };
+
+        asm!(
+            "lidt [{ptr}]",
+            ptr = in(reg) &base
+        );
     }
 }
 
 pub static IDT: Mutex<Idt> = Mutex::new(Idt::default());
 
-extern "x86-interrupt" fn div_handler() {}
+extern "x86-interrupt" fn div_handler(_frame: ExceptionFrame) {
+    kprintln!("DIVIDE BY ZERO!");
+}
+
+pub fn initialize_idt() {
+    let mut entry = IdtEntry::default();
+    entry.set_handler(div_handler);
+    IDT.lock().div_zero = entry;
+
+    unsafe {
+        IDT.lock().activate();
+    }
+}

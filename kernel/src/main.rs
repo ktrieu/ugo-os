@@ -2,11 +2,11 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 
-use core::panic::PanicInfo;
+use core::{arch::asm, panic::PanicInfo};
 
 use common::BootInfo;
 
-use crate::arch::gdt::initialize_gdt;
+use crate::arch::{gdt::initialize_gdt, interrupts::idt::initialize_idt};
 
 #[macro_use]
 mod kprintln;
@@ -26,8 +26,17 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
 
     kprintln!("Hello from UgoOS.");
 
+    unsafe { asm!("sti") };
+
     initialize_gdt();
     kprintln!("GDT initialized.");
+
+    initialize_idt();
+    kprintln!("IDT initialized.");
+
+    unsafe {
+        asm!("cli");
+    }
 
     loop {}
 }
