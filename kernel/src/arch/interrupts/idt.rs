@@ -97,7 +97,8 @@ pub struct IdtBase {
     address: u64,
 }
 
-#[repr(packed)]
+#[repr(C)]
+#[repr(align(16))]
 pub struct Idt {
     pub div_zero: IdtEntry,
     pub debug: IdtEntry,
