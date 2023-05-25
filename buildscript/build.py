@@ -43,22 +43,24 @@ def get_kernel_path(path=""):
     return os.path.join(KERNEL_PATH, path)
 
 
-def run_cmd_in_dir(cmd, args, dir="./", suppress_stderr=False):
+def run_cmd_in_dir(cmd, args, dir="./", suppress_stderr=False, wait=False):
     p = subprocess.Popen(
         [cmd, *args], cwd=dir, stderr=subprocess.DEVNULL if suppress_stderr else None
     )
-    exit_val = p.wait()
-    if exit_val != 0:
-        raise RuntimeError(f"Command failed: {cmd} {' '.join(args)}")
+
+    if wait:
+        exit_val = p.wait()
+        if exit_val != 0:
+            raise RuntimeError(f"Command failed: {cmd} {' '.join(args)}")
 
 
 # Commands
 def cmd_build_bootloader():
-    run_cmd_in_dir("cargo", ["build"], get_bootloader_path())
+    run_cmd_in_dir("cargo", ["build"], get_bootloader_path(), wait=True)
 
 
 def cmd_build_kernel():
-    run_cmd_in_dir("cargo", ["build"], get_kernel_path())
+    run_cmd_in_dir("cargo", ["build"], get_kernel_path(), wait=True)
 
 
 def cmd_build():
@@ -86,36 +88,45 @@ def cmd_install():
     cmd_install_bootloader()
     cmd_install_kernel()
 
+def run_qemu(debug=False):
+    cmd_args = [
+        "-bios",
+        "ovmf/OVMF-pure-efi.fd",
+        "-net",
+        "none",
+        "-drive",
+        f"file=fat:rw:{get_bootimg_path()},format=raw",
+        "-monitor",
+        "stdio",
+        "-D",
+        "qemu.log",
+        "-d",
+        "int",
+        "-no-reboot",
+        "-action",
+        "shutdown=pause"
+    ]
 
-def cmd_run():
-    cmd_build()
-    cmd_install()
+    if debug is True:
+        cmd_args.extend(["-s", "-S"])
+
     run_cmd_in_dir(
-        "qemu-system-x86_64.exe",
-        [
-            "-bios",
-            "ovmf/OVMF-pure-efi.fd",
-            "-net",
-            "none",
-            "-drive",
-            f"file=fat:rw:{get_bootimg_path()},format=raw",
-            "-monitor",
-            "stdio",
-            "-D",
-            "qemu.log",
-            "-d",
-            "int",
-            "-no-reboot",
-            "-action",
-            "shutdown=pause"
-        ],
+        "qemu-system-x86_64",
+        cmd_args,
         # QEMU is giving us weird warnings about UWP, so suppress them here.
         suppress_stderr=True,
+        # Don't wait and just exit immediately so we can start the debugger at the same time.
+        wait=not debug
     )
+
+def cmd_run(debug=False):
+    cmd_build()
+    cmd_install()
+    run_qemu(debug=debug)
 
 
 def usage():
-    print("build.py [build|install|run]")
+    print("build.py [build|install|run|debug]")
 
 
 if __name__ == "__main__":
@@ -132,6 +143,8 @@ if __name__ == "__main__":
             cmd_install()
         elif cmd_name == "run":
             cmd_run()
+        elif cmd_name == "debug":
+            cmd_run(debug=True)
         else:
             usage()
             sys.exit(1)
