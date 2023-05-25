@@ -91,6 +91,8 @@ impl IdtEntry {
     }
 }
 
+// The LIDT instruction reads these fields, but Rust doesn't know that.
+#[allow(dead_code)]
 #[repr(packed)]
 pub struct IdtBase {
     limit: u16,

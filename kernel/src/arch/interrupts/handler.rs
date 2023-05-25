@@ -1,3 +1,4 @@
+#[repr(C)]
 #[repr(packed)]
 pub struct ExceptionFrame {
     instruction_pointer: u64,

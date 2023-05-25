@@ -6,7 +6,7 @@ use common::{KERNEL_START, PAGE_SIZE};
 use xmas_elf::program::{ProgramHeader, Type as ProgramHeaderType};
 use xmas_elf::ElfFile;
 
-use crate::addr::{align_down, align_up, is_aligned, Address, Page, PhysFrame, VirtPage};
+use crate::addr::{is_aligned, Address, Page, PhysFrame, VirtPage};
 use crate::frame::FrameAllocator;
 use crate::mappings::MappingFlags;
 use crate::{
