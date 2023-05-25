@@ -35,7 +35,13 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     kprintln!("IDT initialized.");
 
     unsafe {
-        asm!("cli");
+        asm!(
+            "
+            cli
+            mov rax, 0
+            div rax
+            "
+        );
     }
 
     loop {}

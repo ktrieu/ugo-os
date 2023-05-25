@@ -177,6 +177,8 @@ pub static IDT: Mutex<Idt> = Mutex::new(Idt::default());
 
 extern "x86-interrupt" fn div_handler(_frame: ExceptionFrame) {
     kprintln!("DIVIDE BY ZERO!");
+
+    loop {}
 }
 
 pub fn initialize_idt() {
