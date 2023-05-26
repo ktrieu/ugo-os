@@ -41,7 +41,7 @@ impl IdtEntryBase {
 
     fn set_address(&mut self, address: u64) {
         // Inconveniently, the address is in two fields.
-        let address_low_mask = !(u64::MAX << 16);
+        let address_low_mask = 2_u64.pow(16) - 1;
         let address_low = address & address_low_mask;
         let address_high = address >> 16;
 
@@ -73,7 +73,7 @@ impl IdtEntryWithErrorCode {
     // Safety: handler must point to a function defined with the x86-interrupt calling convention.
     pub fn set_handler(&mut self, handler: IdtHandlerWithErrorCode) {
         self.0
-            .set_handler(&handler as *const IdtHandlerWithErrorCode as u64);
+            .set_handler(handler as *const IdtHandlerWithErrorCode as u64);
     }
 }
 
@@ -87,7 +87,7 @@ impl IdtEntry {
     }
 
     pub fn set_handler(&mut self, handler: IdtHandler) {
-        self.0.set_handler(&handler as *const IdtHandler as u64);
+        self.0.set_handler(handler as *const IdtHandler as u64);
     }
 }
 
