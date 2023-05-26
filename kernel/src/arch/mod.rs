@@ -1,5 +1,6 @@
 use bilge::prelude::*;
 
+pub mod flags;
 pub mod gdt;
 pub mod interrupts;
 

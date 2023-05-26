@@ -6,7 +6,10 @@ use core::{arch::asm, panic::PanicInfo};
 
 use common::BootInfo;
 
-use crate::arch::{gdt::initialize_gdt, interrupts::idt::initialize_idt};
+use crate::arch::{
+    gdt::initialize_gdt,
+    interrupts::{idt::initialize_idt, with_interrupts_disabled},
+};
 
 #[macro_use]
 mod kprintln;
@@ -26,23 +29,11 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
 
     kprintln!("Hello from UgoOS.");
 
-    unsafe { asm!("sti") };
-
-    initialize_gdt();
-    kprintln!("GDT initialized.");
-
-    initialize_idt();
-    kprintln!("IDT initialized.");
-
-    unsafe {
-        asm!(
-            "
-            cli
-            mov rax, 0
-            div rax
-            "
-        );
-    }
+    with_interrupts_disabled(|| {
+        initialize_gdt();
+        initialize_idt();
+    });
+    kprintln!("Interrupts initialized.");
 
     loop {}
 }
