@@ -157,9 +157,7 @@ impl Gdt {
     fn get_selector_by_index(index: usize) -> SegmentSelector {
         SegmentSelector::new_global(
             PrivilegeLevel::Kernel,
-            (Self::KERNEL_CODE_SEGMENT_IDX * GdtEntry::LENGTH_BYTES)
-                .try_into()
-                .unwrap(),
+            (index * GdtEntry::LENGTH_BYTES).try_into().unwrap(),
         )
     }
 
