@@ -6,14 +6,14 @@ use spin::Mutex;
 use super::PrivilegeLevel;
 
 #[bitsize(1)]
-#[derive(FromBits)]
+#[derive(Debug, FromBits)]
 pub enum SelectorTarget {
     Global = 0,
     Local = 1,
 }
 
 #[bitsize(16)]
-#[derive(FromBits)]
+#[derive(DebugBits, FromBits)]
 pub struct SegmentSelector {
     privilege_level: PrivilegeLevel,
     target: SelectorTarget,
@@ -154,11 +154,17 @@ impl Gdt {
         self.entries[Self::USER_DATA_SEGMENT_IDX] = GdtEntry::new_user_data_segment();
     }
 
-    pub fn get_kernel_code_selector() -> SegmentSelector {
+    fn get_selector_by_index(index: usize) -> SegmentSelector {
         SegmentSelector::new_global(
             PrivilegeLevel::Kernel,
-            Self::KERNEL_CODE_SEGMENT_IDX.try_into().unwrap(),
+            (Self::KERNEL_CODE_SEGMENT_IDX * GdtEntry::LENGTH_BYTES)
+                .try_into()
+                .unwrap(),
         )
+    }
+
+    pub fn get_kernel_code_selector() -> SegmentSelector {
+        Gdt::get_selector_by_index(Self::KERNEL_CODE_SEGMENT_IDX)
     }
 
     // Safety: The GDT this points to must be initialized with valid kernel code/data segments before calling this function.
