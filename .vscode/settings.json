@@ -3,5 +3,6 @@
         "bootloader/Cargo.toml",
         "kernel/Cargo.toml",
         "common/Cargo.toml"
-    ]
+    ],
+    "rust-analyzer.showUnlinkedFileNotification": false
 }
