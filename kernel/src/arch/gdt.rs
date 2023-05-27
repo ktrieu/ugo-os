@@ -3,6 +3,8 @@ use core::arch::asm;
 use bilge::prelude::*;
 use spin::Mutex;
 
+use crate::sync::InterruptSafeSpinlock;
+
 use super::PrivilegeLevel;
 
 #[bitsize(1)]
@@ -196,7 +198,7 @@ impl Gdt {
     }
 }
 
-static GDT: Mutex<Gdt> = Mutex::new(Gdt {
+static GDT: InterruptSafeSpinlock<Gdt> = InterruptSafeSpinlock::new(Gdt {
     entries: [GdtEntry::default(); Gdt::LENGTH],
 });
 

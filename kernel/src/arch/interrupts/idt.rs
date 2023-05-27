@@ -3,9 +3,12 @@ use core::arch::asm;
 use bilge::prelude::*;
 use spin::Mutex;
 
-use crate::arch::{
-    gdt::{Gdt, SegmentSelector},
-    PrivilegeLevel,
+use crate::{
+    arch::{
+        gdt::{Gdt, SegmentSelector},
+        PrivilegeLevel,
+    },
+    sync::InterruptSafeSpinlock,
 };
 
 use super::handler::ExceptionFrame;
@@ -180,7 +183,7 @@ impl Idt {
     }
 }
 
-pub static IDT: Mutex<Idt> = Mutex::new(Idt::default());
+pub static IDT: InterruptSafeSpinlock<Idt> = InterruptSafeSpinlock::new(Idt::default());
 
 extern "x86-interrupt" fn div_handler(_frame: ExceptionFrame) {
     kprintln!("DIVIDE BY ZERO!");

@@ -1,6 +1,4 @@
-use spin::Mutex;
-
-use crate::arch::io_port::Port;
+use crate::{arch::io_port::Port, sync::InterruptSafeSpinlock};
 
 use super::{
     handler::ExceptionFrame,
@@ -199,11 +197,18 @@ const TIMER_INTERRUPT: IRQCode = IRQCode::IRQ0;
 const KEYBOARD_INTERRUPT: IRQCode = IRQCode::IRQ1;
 
 pub extern "x86-interrupt" fn keyboard_handler(_frame: ExceptionFrame) {
-    kprintln!("KEYBOARD PRESSED!");
+    let scancode = Port::<u8>::new(0x60).read();
+    kprintln!("KEYBOARD PRESSED! - {:02x}", scancode);
     PIC.lock().signal_eoi(KEYBOARD_INTERRUPT);
 }
 
-pub static PIC: Mutex<CascadedPics> = Mutex::new(CascadedPics::new());
+pub extern "x86-interrupt" fn timer_handler(_frame: ExceptionFrame) {
+    // kprintln!("TIMER INTERRUPT!");
+    PIC.lock().signal_eoi(TIMER_INTERRUPT);
+}
+
+pub static PIC: InterruptSafeSpinlock<CascadedPics> =
+    InterruptSafeSpinlock::new(CascadedPics::new());
 
 pub fn initialize_pic() {
     PIC.lock().initialize();
@@ -211,4 +216,8 @@ pub fn initialize_pic() {
     let idt_index = PIC.lock().get_idt_offset(KEYBOARD_INTERRUPT);
     PIC.lock().enable_interrupt(KEYBOARD_INTERRUPT);
     add_user_defined_handler(idt_index, keyboard_handler);
+
+    let idt_index = PIC.lock().get_idt_offset(TIMER_INTERRUPT);
+    PIC.lock().enable_interrupt(TIMER_INTERRUPT);
+    add_user_defined_handler(idt_index, timer_handler);
 }

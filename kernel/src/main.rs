@@ -18,6 +18,7 @@ mod kprintln;
 
 mod arch;
 mod framebuffer;
+mod sync;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {

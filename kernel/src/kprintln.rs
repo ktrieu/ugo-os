@@ -1,10 +1,9 @@
 use common::FramebufferInfo;
 use conquer_once::spin::OnceCell;
-use spin::Mutex;
 
-use crate::framebuffer::TextFramebuffer;
+use crate::{framebuffer::TextFramebuffer, sync::InterruptSafeSpinlock};
 
-pub static TEXT_FB: OnceCell<Mutex<TextFramebuffer>> = OnceCell::uninit();
+pub static TEXT_FB: OnceCell<InterruptSafeSpinlock<TextFramebuffer>> = OnceCell::uninit();
 
 macro_rules! kprintln {
     ($($args:tt)*) => {
@@ -22,6 +21,6 @@ pub fn init_kprintln(info: &FramebufferInfo) {
     TEXT_FB.init_once(|| {
         let mut fb = TextFramebuffer::new(info);
         fb.clear();
-        Mutex::new(fb)
+        InterruptSafeSpinlock::new(fb)
     })
 }
