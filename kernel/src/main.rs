@@ -8,7 +8,7 @@ use common::BootInfo;
 
 use crate::arch::{
     gdt::initialize_gdt,
-    interrupts::{idt::initialize_idt, with_interrupts_disabled},
+    interrupts::{idt::initialize_idt, pic::initialize_pic, with_interrupts_disabled},
 };
 
 #[macro_use]
@@ -32,6 +32,7 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     with_interrupts_disabled(|| {
         initialize_gdt();
         initialize_idt();
+        initialize_pic();
     });
     kprintln!("Interrupts initialized.");
 

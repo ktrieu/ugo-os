@@ -128,7 +128,7 @@ pub struct Idt {
 
 impl Idt {
     const NUM_ENTRIES: u16 = 255;
-    const USER_DEFINED_START: u16 = 32;
+    pub const USER_DEFINED_START: u16 = 32;
 
     const NUM_USER_DEFINED: u16 = Self::NUM_ENTRIES - Self::USER_DEFINED_START;
 
@@ -191,4 +191,14 @@ pub fn initialize_idt() {
     unsafe {
         IDT.lock().activate();
     }
+}
+
+pub fn add_user_defined_handler(index: u16, handler: IdtHandler) {
+    assert!(index >= Idt::USER_DEFINED_START);
+
+    let mut new_entry = IdtEntry::default();
+    new_entry.set_handler(handler);
+
+    let user_defined_index: usize = (index - Idt::USER_DEFINED_START).into();
+    IDT.lock().user_defined[user_defined_index] = new_entry;
 }

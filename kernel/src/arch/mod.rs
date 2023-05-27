@@ -3,6 +3,7 @@ use bilge::prelude::*;
 pub mod flags;
 pub mod gdt;
 pub mod interrupts;
+pub mod io_port;
 
 #[bitsize(2)]
 #[derive(Debug, Clone, Copy, FromBits)]
