@@ -11,7 +11,7 @@
             "cwd": "${workspaceFolder}",
             "program": "${workspaceFolder}/kernel/target/kernel/debug/kernel",
             "processCreateCommands": [
-                "shell ./build.sh run",
+                "shell ./build run",
             ],
         },
         {
@@ -24,7 +24,7 @@
                 "target create ${workspaceFolder}/kernel/target/kernel/debug/kernel"
             ],
             "processCreateCommands": [
-                "shell ./build.sh debug",
+                "shell ./build debug",
             ],
             "postRunCommands": [
                 "gdb-remote 1234"
