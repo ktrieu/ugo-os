@@ -122,14 +122,17 @@ pub struct Idt {
     pub machine_check: IdtEntry,
     pub simd_floating_point: IdtEntry,
     pub virtualization: IdtEntry,
+    pub unused_exceptions: [IdtEntry; Self::NUM_RESERVED_EXCEPTIONS as usize],
     // Interrupts 32 - 255 are user defined and have no error codes.
     pub user_defined: [IdtEntry; Self::NUM_USER_DEFINED as usize],
 }
 
 impl Idt {
     const NUM_ENTRIES: u16 = 255;
-    pub const USER_DEFINED_START: u16 = 32;
+    const LAST_EXCEPTION: u16 = 20;
+    const NUM_RESERVED_EXCEPTIONS: u16 = Self::USER_DEFINED_START - Self::LAST_EXCEPTION;
 
+    pub const USER_DEFINED_START: u16 = 32;
     const NUM_USER_DEFINED: u16 = Self::NUM_ENTRIES - Self::USER_DEFINED_START;
 
     pub const fn default() -> Self {
@@ -154,6 +157,8 @@ impl Idt {
             machine_check: IdtEntry::default(),
             simd_floating_point: IdtEntry::default(),
             virtualization: IdtEntry::default(),
+            // User-defined interrupts start at index 32, but the hardware exceptions end at 20.
+            unused_exceptions: [IdtEntry::default(); Self::NUM_RESERVED_EXCEPTIONS as usize],
             user_defined: [IdtEntry::default(); Self::NUM_USER_DEFINED as usize],
         }
     }
