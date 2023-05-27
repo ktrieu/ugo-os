@@ -80,6 +80,15 @@ impl Pic {
 
     const CMD_EOI: u8 = 0x20;
 
+    const WAIT_PORT: Port<u8> = Port::new(0x80);
+
+    // Wait for the PIC to process commands. Apparently writing to port 0x80
+    // creates enough of a wait, and we can't really do anything else without
+    // interrupts working.
+    pub fn io_port_wait() {
+        Self::WAIT_PORT.write(0);
+    }
+
     pub const fn new(ty: PicType, port_base: u16, interrupt_offset: u8) -> Self {
         Pic {
             command_port: Port::new(port_base),
@@ -98,15 +107,19 @@ impl Pic {
         // First, the init byte OR'ed with the option enabling the fourth init word.
         self.command_port
             .write(Self::CMD_INIT | Self::CMD_INIT_ICW4);
+        Self::io_port_wait();
         // Write the interrupt offset.
-        self.command_port.write(self.interrupt_offset);
+        self.data_port.write(self.interrupt_offset);
+        Self::io_port_wait();
         // Inform the master which port the slave is on, and tell the slave which port it's been cascaded to.
         match self.ty {
-            PicType::Master => self.command_port.write(Self::CMD_MASTER),
-            PicType::Slave => self.command_port.write(Self::CMD_SLAVE),
+            PicType::Master => self.data_port.write(Self::CMD_MASTER),
+            PicType::Slave => self.data_port.write(Self::CMD_SLAVE),
         };
+        Self::io_port_wait();
         // And set to 8086 mode, whatever that means.
-        self.command_port.write(Self::CMD_ICW4);
+        self.data_port.write(Self::CMD_ICW4);
+        Self::io_port_wait();
 
         // Restore the saved IRQ masks.
         self.data_port.write(irq_masks);
@@ -187,7 +200,7 @@ const KEYBOARD_INTERRUPT: IRQCode = IRQCode::IRQ1;
 
 pub extern "x86-interrupt" fn keyboard_handler(_frame: ExceptionFrame) {
     kprintln!("KEYBOARD PRESSED!");
-    PIC.lock().signal_eoi(TIMER_INTERRUPT);
+    PIC.lock().signal_eoi(KEYBOARD_INTERRUPT);
 }
 
 pub static PIC: Mutex<CascadedPics> = Mutex::new(CascadedPics::new());
@@ -195,7 +208,7 @@ pub static PIC: Mutex<CascadedPics> = Mutex::new(CascadedPics::new());
 pub fn initialize_pic() {
     PIC.lock().initialize();
 
-    let idt_index = PIC.lock().get_idt_offset(TIMER_INTERRUPT);
-    PIC.lock().enable_interrupt(TIMER_INTERRUPT);
+    let idt_index = PIC.lock().get_idt_offset(KEYBOARD_INTERRUPT);
+    PIC.lock().enable_interrupt(KEYBOARD_INTERRUPT);
     add_user_defined_handler(idt_index, keyboard_handler);
 }
