@@ -4,5 +4,6 @@
         "kernel/Cargo.toml",
         "common/Cargo.toml"
     ],
-    "rust-analyzer.showUnlinkedFileNotification": false
+    "rust-analyzer.showUnlinkedFileNotification": false,
+    "editor.formatOnSave": true
 }
