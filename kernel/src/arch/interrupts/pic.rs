@@ -214,11 +214,13 @@ pub static PIC: InterruptSafeSpinlock<CascadedPics> =
 pub fn initialize_pic() {
     PIC.lock().initialize();
 
-    let idt_index = PIC.lock().get_idt_offset(KEYBOARD_INTERRUPT);
-    PIC.lock().enable_interrupt(KEYBOARD_INTERRUPT);
-    add_user_defined_handler(idt_index, keyboard_handler);
-
-    let idt_index = PIC.lock().get_idt_offset(TIMER_INTERRUPT);
-    PIC.lock().enable_interrupt(TIMER_INTERRUPT);
-    add_user_defined_handler(idt_index, timer_handler);
+    let pic = PIC.lock();
+    pic.enable_interrupt(KEYBOARD_INTERRUPT);
+    pic.enable_interrupt(TIMER_INTERRUPT);
+    pic.get_idt_offset(KEYBOARD_INTERRUPT);
+    // Safety: keyboard/timer_handler are declared with x86-interrupt.s
+    unsafe {
+        add_user_defined_handler(pic.get_idt_offset(KEYBOARD_INTERRUPT), keyboard_handler);
+        add_user_defined_handler(pic.get_idt_offset(TIMER_INTERRUPT), timer_handler);
+    }
 }

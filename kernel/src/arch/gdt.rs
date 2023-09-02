@@ -166,7 +166,7 @@ impl Gdt {
         Gdt::get_selector_by_index(Self::KERNEL_CODE_SEGMENT_IDX)
     }
 
-    // Safety: The GDT this points to must be initialized with valid kernel code/data segments before calling this function.
+    /// Safety: The GDT this points to must be initialized with valid kernel code/data segments before calling this function.
     pub unsafe fn activate(&self) {
         let length: u16 = (Self::LENGTH * GdtEntry::LENGTH_BYTES - 1)
             .try_into()

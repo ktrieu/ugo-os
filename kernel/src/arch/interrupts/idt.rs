@@ -72,8 +72,8 @@ impl IdtEntryWithErrorCode {
         Self(IdtEntryBase::default())
     }
 
-    // Safety: handler must point to a function defined with the x86-interrupt calling convention.
-    pub fn _set_handler(&mut self, handler: _IdtHandlerWithErrorCode) {
+    /// Safety: handler must point to a function defined with the x86-interrupt calling convention.
+    pub unsafe fn _set_handler(&mut self, handler: _IdtHandlerWithErrorCode) {
         self.0
             .set_handler(handler as *const _IdtHandlerWithErrorCode as u64);
     }
@@ -88,7 +88,8 @@ impl IdtEntry {
         Self(IdtEntryBase::default())
     }
 
-    pub fn set_handler(&mut self, handler: IdtHandler) {
+    /// Safety: handler must point to a function defined with the x86-interrupt calling convention.
+    pub unsafe fn set_handler(&mut self, handler: IdtHandler) {
         self.0.set_handler(handler as *const IdtHandler as u64);
     }
 }
@@ -165,7 +166,7 @@ impl Idt {
         }
     }
 
-    // Safety: This IDT must be in a valid format.
+    /// Safety: This IDT must be in a valid format.
     pub unsafe fn activate(&self) {
         let limit = (Idt::NUM_ENTRIES * IdtEntryBase::LENGTH_BYTES) - 1;
         let base = IdtBase {
@@ -192,7 +193,10 @@ extern "x86-interrupt" fn div_handler(_frame: ExceptionFrame) {
 
 pub fn initialize_idt() {
     let mut entry = IdtEntry::default();
-    entry.set_handler(div_handler);
+    // Safety: div_handler is declared with the x86-interrupt convention.
+    unsafe {
+        entry.set_handler(div_handler);
+    }
     IDT.lock().div_zero = entry;
 
     unsafe {
@@ -200,11 +204,14 @@ pub fn initialize_idt() {
     }
 }
 
-pub fn add_user_defined_handler(index: u16, handler: IdtHandler) {
+/// Safety: handler must be declared with the x86-interrupt calling convention.
+pub unsafe fn add_user_defined_handler(index: u16, handler: IdtHandler) {
     assert!(index >= Idt::USER_DEFINED_START);
 
     let mut new_entry = IdtEntry::default();
-    new_entry.set_handler(handler);
+    unsafe {
+        new_entry.set_handler(handler);
+    }
 
     let user_defined_index: usize = (index - Idt::USER_DEFINED_START).into();
     IDT.lock().user_defined[user_defined_index] = new_entry;

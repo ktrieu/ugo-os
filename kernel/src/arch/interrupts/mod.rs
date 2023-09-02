@@ -6,7 +6,6 @@ pub mod handler;
 pub mod idt;
 pub mod pic;
 
-// Safety: You must ensure interrupts are eventually re-enabled.
 pub fn disable_interrupts() {
     unsafe { asm!("cli") };
 }

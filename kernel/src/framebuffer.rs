@@ -56,7 +56,7 @@ impl Framebuffer {
             .wrapping_add(y * self.stride * self.bpp() + (x * self.bpp()))
     }
 
-    // Safety: ptr must be a valid pointer to framebuffer memory.
+    /// Safety: ptr must be a valid pointer to framebuffer memory.
     unsafe fn write_pixel_to_ptr(&mut self, ptr: *mut u8, mut c: Color) {
         match self.format {
             FramebufferFormat::Bgr => c.0.reverse(),
