@@ -2,15 +2,13 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 
-use core::{arch::asm, panic::PanicInfo};
+use core::panic::PanicInfo;
 
 use common::BootInfo;
 
 use crate::arch::{
     gdt::initialize_gdt,
-    interrupts::{
-        enable_interrupts, idt::initialize_idt, pic::initialize_pic, with_interrupts_disabled,
-    },
+    interrupts::{enable_interrupts, idt::initialize_idt, pic::initialize_pic},
 };
 
 #[macro_use]

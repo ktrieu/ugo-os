@@ -19,7 +19,7 @@ pub fn are_interrupts_enabled() -> bool {
     get_rflags().interrupts_enabled()
 }
 
-pub fn with_interrupts_disabled<R, F: FnOnce() -> R>(f: F) -> R {
+pub fn _with_interrupts_disabled<R, F: FnOnce() -> R>(f: F) -> R {
     let was_enabled = are_interrupts_enabled();
 
     if was_enabled {

@@ -1,7 +1,6 @@
 use core::arch::asm;
 
 use bilge::prelude::*;
-use spin::Mutex;
 
 use crate::sync::InterruptSafeSpinlock;
 

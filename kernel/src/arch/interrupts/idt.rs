@@ -1,7 +1,6 @@
 use core::arch::asm;
 
 use bilge::prelude::*;
-use spin::Mutex;
 
 use crate::{
     arch::{
@@ -61,7 +60,7 @@ impl IdtEntryBase {
 }
 
 type IdtHandler = extern "x86-interrupt" fn(ExceptionFrame);
-type IdtHandlerWithErrorCode = extern "x86-interrupt" fn(ExceptionFrame, error_code: u64);
+type _IdtHandlerWithErrorCode = extern "x86-interrupt" fn(ExceptionFrame, error_code: u64);
 
 // Wrapper types so we can ensure we register the correct handlers at compile time.
 #[repr(transparent)]
@@ -74,9 +73,9 @@ impl IdtEntryWithErrorCode {
     }
 
     // Safety: handler must point to a function defined with the x86-interrupt calling convention.
-    pub fn set_handler(&mut self, handler: IdtHandlerWithErrorCode) {
+    pub fn _set_handler(&mut self, handler: _IdtHandlerWithErrorCode) {
         self.0
-            .set_handler(handler as *const IdtHandlerWithErrorCode as u64);
+            .set_handler(handler as *const _IdtHandlerWithErrorCode as u64);
     }
 }
 

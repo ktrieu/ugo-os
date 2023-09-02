@@ -13,6 +13,7 @@ pub enum PicType {
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub enum IRQCode {
     IRQ0 = 0,
     IRQ1 = 1,
