@@ -6,7 +6,7 @@ use common::{KERNEL_START, PAGE_SIZE};
 use xmas_elf::program::{ProgramHeader, Type as ProgramHeaderType};
 use xmas_elf::ElfFile;
 
-use crate::addr::{is_aligned, Address, Page, PhysFrame, VirtPage};
+use crate::addr::{Address, Page, PhysFrame, VirtPage};
 use crate::frame::FrameAllocator;
 use crate::mappings::MappingFlags;
 use crate::{
@@ -79,124 +79,12 @@ impl<'a> Loader<'a> {
         })
     }
 
-    // fn map_zeroed_memory(
-    //     &self,
-    //     phdr: &ProgramHeader,
-    //     mappings: &mut Mappings,
-    //     allocator: &mut FrameAllocator,
-    // ) -> LoaderResult<()> {
-    //     let phdr_phys_start = PhysAddr::new(self.kernel_phys_offset.as_u64() + phdr.offset());
-    //     let virtual_offset = phdr.virtual_addr() - phdr_phys_start.as_u64();
-    //     let zero_mem_start = PhysAddr::new(phdr_phys_start.as_u64() + phdr.file_size());
-
-    //     bootlog!("Expanding zeroed section.");
-    //     bootlog!("Section start: {}", phdr_phys_start);
-    //     bootlog!("Zero section start: {}", zero_mem_start);
-
-    //     if !is_aligned(zero_mem_start.as_u64(), PAGE_SIZE) {
-    //         bootlog!("Zero mem start not aligned, copying last non-zero frame.");
-    //         // If the zeroed section isn't aligned, we have to copy the last non-zero frame to a new frame
-    //         // then zero the required memory. This is because the part of the frame in the file that should be zeroed
-    //         // almost certainly contains other data.
-    //         let src_frame = PhysFrame::from_containing_addr(zero_mem_start);
-    //         bootlog!("Last non zero frame is {}", src_frame);
-
-    //         // If the start of the program header and the zeroed memory start are in the same
-    //         // frame, the offset is the distance from the frame base to the section start.
-    //         let src_offset_in_frame = if src_frame == PhysFrame::from_containing_addr(phdr_phys_start) {
-    //             phdr_phys_start.as_u64() - src_frame.base_u64()
-    //         } else {
-    //             // Otherwise, we need to start directly at the start of the frame
-    //             // containing the zero memory start.
-    //             0
-    //         };
-
-    //         let dst_frame = allocator.alloc_frame();
-    //         let copy_dst = PhysAddr::new(dst_frame.base_u64() + src_offset_in_frame);
-
-    //         // Zero our frame.
-    //         // Safety: Since dst_frame is a fresh page, it's aligned and clear to write a page of zeroes to.
-    //         unsafe {
-    //             write_bytes(dst_frame.as_u8_ptr_mut(), 0, PAGE_SIZE as usize);
-    //         }
-
-    //         // We need to copy from the src_offset to the end of the non-zeroed data.
-    //         let bytes_to_copy = zero_mem_start.as_u64() - phdr_phys_start.as_u64();
-
-    //         // Safety: src_frame and dst_frame are guaranteed to not overlap, since dst_frame is freshly allocated
-    //         // from free memory via FrameAllocator.
-    //         unsafe {
-    //             copy_nonoverlapping(
-    //                 phdr_phys_start.as_u8_ptr(),
-    //                 copy_dst.as_u8_ptr_mut(),
-    //                 bytes_to_copy as usize,
-    //             )
-    //         }
-
-    //         let virtual_address = VirtAddr::new(zero_mem_start.as_u64() + virtual_offset);
-
-    //         mappings.map_page(
-    //             dst_frame,
-    //             VirtPage::from_containing_addr(virtual_address),
-    //             allocator,
-    //             phdr_flags_to_mappings_flags(phdr),
-    //         );
-    //     };
-
-    //     // Since we've handled the unaligned case above, we can now align the address up and deal with the remaining pages.
-    //     let zero_mem_start = zero_mem_start.align_up(PAGE_SIZE);
-    //     if phdr_phys_start.as_u64() + phdr.mem_size() > zero_mem_start.as_u64() {
-    //         // We just aligned this, so this is a base address.
-    //         let start_page = VirtPage::from_base_u64(zero_mem_start.as_u64() + virtual_offset);
-    //         let end_page = VirtPage::from_containing_u64(phdr.virtual_addr() + phdr.mem_size());
-    //         let pages = VirtPage::range_inclusive(start_page, end_page);
-
-    //         let frames =
-    //             mappings.alloc_and_map_range(pages, allocator, phdr_flags_to_mappings_flags(phdr));
-
-    //         for frame in frames.iter() {
-    //             // Zero the frames we allocated.
-    //             // Safety: Since dst_frame is a fresh page, it's aligned and clear to write a page of zeroes to.
-    //             unsafe {
-    //                 write_bytes(frame.as_u8_ptr_mut(), 0, PAGE_SIZE as usize);
-    //             }
-    //         }
-    //     }
-
-    //     Ok(())
-    // }
-
     fn map_load_segment(
         &self,
         phdr: &ProgramHeader,
         mappings: &mut Mappings,
         allocator: &mut FrameAllocator,
     ) -> LoaderResult<()> {
-        // let vaddr = VirtAddr::new(phdr.virtual_addr());
-        // let pages = VirtPage::range_inclusive(
-        //     VirtPage::from_containing_addr(vaddr),
-        //     VirtPage::from_containing_u64(phdr.virtual_addr() + phdr.file_size()),
-        // );
-
-        // if !is_valid_kernel_addr(vaddr) {
-        //     return Err(LoaderError::InvalidKernelSegmentAddress(vaddr));
-        // }
-
-        // if phdr.align() != PAGE_SIZE {
-        //     return Err(LoaderError::ImproperAlignment(phdr.align()));
-        // }
-
-        // let start_frame =
-        //     PhysFrame::from_containing_u64(self.kernel_phys_offset.as_u64() + phdr.offset());
-
-        // let frames = PhysFrame::range_length(start_frame, pages.len());
-
-        // mappings.map_page_range(frames, pages, allocator, phdr_flags_to_mappings_flags(phdr));
-
-        // if phdr.mem_size() > phdr.file_size() {
-        //     self.map_zeroed_memory(phdr, mappings, allocator)?;
-        // }
-
         if phdr.align() != PAGE_SIZE {
             return Err(LoaderError::ImproperAlignment(phdr.align()));
         }
