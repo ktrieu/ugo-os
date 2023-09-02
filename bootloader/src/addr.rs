@@ -189,6 +189,20 @@ where
         Self::range_exclusive(start, end)
     }
 
+    fn range_inclusive_u64(start: u64, end: u64) -> PageRange<Self> {
+        let start = Self::from_containing_u64(start);
+        let end = Self::from_containing_u64(end);
+
+        return Self::range_inclusive(start, end);
+    }
+
+    fn range_exclusive_u64(start: u64, end: u64) -> PageRange<Self> {
+        let start = Self::from_containing_u64(start);
+        let end = Self::from_containing_u64(end);
+
+        return Self::range_exclusive(start, end);
+    }
+
     fn from_base_u64(addr: u64) -> Self {
         Self::from_base_addr(Self::A::new(addr))
     }
