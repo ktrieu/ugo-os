@@ -1,7 +1,7 @@
 use common::PAGE_SIZE;
 use uefi::table::boot::{MemoryMap, MemoryType};
 
-use crate::addr::{Address, Page, PageRange, PhysAddr, PhysFrame};
+use common::addr::{Address, Page, PageRange, PhysAddr, PhysFrame};
 
 pub struct FrameAllocator {
     // The first frame we've allocated, inclusive

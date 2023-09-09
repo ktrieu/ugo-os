@@ -6,6 +6,7 @@ use core::{
 };
 
 use common::{
+    addr::{Address, Page, PageRange, PageRangeIter, PhysAddr, PhysFrame, VirtPage},
     BootInfo, FramebufferFormat, FramebufferInfo, MemRegion, MemRegions, RegionType, BOOTINFO_SIZE,
     BOOTINFO_START, PAGE_SIZE,
 };
@@ -15,7 +16,6 @@ use uefi::{
 };
 
 use crate::{
-    addr::{Address, Page, PageRange, PageRangeIter, PhysAddr, PhysFrame, VirtPage},
     frame::FrameAllocator,
     graphics::Framebuffer,
     mappings::{MappingFlags, Mappings},

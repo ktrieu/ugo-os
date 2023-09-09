@@ -2,17 +2,17 @@ use core::cmp::max;
 use core::fmt::Display;
 use core::ptr::{copy_nonoverlapping, write_bytes};
 
-use common::{KERNEL_START, PAGE_SIZE};
+use common::{
+    addr::{PhysAddr, VirtAddr},
+    KERNEL_START, PAGE_SIZE,
+};
 use xmas_elf::program::{ProgramHeader, Type as ProgramHeaderType};
 use xmas_elf::ElfFile;
 
-use crate::addr::{Address, Page, PhysFrame, VirtPage};
 use crate::frame::FrameAllocator;
 use crate::mappings::MappingFlags;
-use crate::{
-    addr::{PhysAddr, VirtAddr},
-    mappings::Mappings,
-};
+use crate::mappings::Mappings;
+use common::addr::{Address, Page, PhysFrame, VirtPage};
 
 pub struct KernelAddresses {
     pub kernel_end: VirtAddr,

@@ -1,8 +1,10 @@
-use common::PHYSMEM_START;
+use common::{
+    addr::{Page, PageRange, PhysAddr, PhysFrame, VirtPage},
+    PHYSMEM_START,
+};
 use uefi::table::boot::MemoryMap;
 
 use crate::{
-    addr::{Page, PageRange, PhysAddr, PhysFrame, VirtPage},
     frame::FrameAllocator,
     page::{IntermediatePageTable, PageMapLevel4, PageTableEntry},
     page::{PageMapLevel1, PageTable},

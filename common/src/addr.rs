@@ -1,6 +1,6 @@
 use core::fmt::Display;
 
-use common::{PAGE_SIZE, PHYSADDR_SIZE, VIRTADDR_SIZE};
+use crate::{PAGE_SIZE, PHYSADDR_SIZE, VIRTADDR_SIZE};
 
 pub fn align_down(addr: u64, align: u64) -> u64 {
     if !align.is_power_of_two() {

@@ -4,12 +4,12 @@
 
 use core::fmt::Display;
 
-use common::{PAGE_SIZE, PHYSADDR_SIZE};
-
-use crate::{
+use common::{
     addr::{Address, Page, PhysAddr, VirtAddr},
-    frame::FrameAllocator,
+    PAGE_SIZE, PHYSADDR_SIZE,
 };
+
+use crate::frame::FrameAllocator;
 
 #[repr(transparent)]
 pub struct PageTableEntry {

@@ -11,7 +11,6 @@ use uefi::prelude::*;
 #[macro_use]
 mod logger;
 
-mod addr;
 mod boot_info;
 mod frame;
 mod fs;
@@ -22,12 +21,13 @@ mod page;
 
 use uefi::table::boot::MemoryType;
 
-use crate::addr::Address;
 use crate::boot_info::create_boot_info;
 use crate::frame::FrameAllocator;
 use crate::loader::Loader;
 use crate::logger::LOGGER;
 use crate::mappings::Mappings;
+
+use common::addr::Address;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
