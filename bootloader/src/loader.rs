@@ -123,14 +123,21 @@ impl<'a> Loader<'a> {
         // If there are any pages in this range, we have to allocate
         // zero and map them.
         if zeroed_pages.len() != 0 {
-            let zeroed_frames = allocator.alloc_frame_range(zeroed_pages.len());
-            // Zero out all these frames.
-            for frame in zeroed_frames.iter() {
-                // Safety: This is a freshly allocated frame, so the base address
-                // is aligned and it is clear to write.
-                unsafe {
-                    write_bytes(frame.as_u8_ptr_mut(), 0, PAGE_SIZE as usize);
-                }
+            // Map the entire range to fresh memory
+            let zeroed_frames = mappings.alloc_and_map_range(
+                zeroed_pages,
+                allocator,
+                phdr_flags_to_mappings_flags(phdr),
+            );
+
+            // Safety: Since zeroed_frames comes from the frame allocator
+            // it is clear for write and aligned.
+            unsafe {
+                write_bytes(
+                    zeroed_frames.first().as_u8_ptr_mut(),
+                    0,
+                    (zeroed_frames.len() * PAGE_SIZE).try_into().unwrap(),
+                );
             }
 
             // If the last file page and the first zero page are the same,
@@ -168,14 +175,6 @@ impl<'a> Loader<'a> {
                         copy_len as usize,
                     );
                 }
-
-                // Finally, remap this new frame we've written.
-                mappings.map_page(
-                    dst_frame,
-                    zeroed_pages.first(),
-                    allocator,
-                    phdr_flags_to_mappings_flags(phdr),
-                );
             }
         }
 
