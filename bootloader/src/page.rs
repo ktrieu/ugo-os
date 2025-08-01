@@ -102,7 +102,7 @@ const NUM_PAGE_TABLE_ENTRIES: usize = 512;
 type PageTableEntries = [PageTableEntry; NUM_PAGE_TABLE_ENTRIES];
 
 pub trait PageTable: Sized {
-    fn entries(&self) -> &PageTableEntries;
+    fn _entries(&self) -> &PageTableEntries;
     fn entries_mut(&mut self) -> &mut PageTableEntries;
     fn get_entry_idx(addr: VirtAddr) -> usize;
 
@@ -137,7 +137,7 @@ pub trait PageTable: Sized {
 }
 
 pub trait IntermediatePageTable<E: PageTable>: PageTable {
-    fn insert<'a>(&'a mut self, addr: VirtAddr, allocator: &mut FrameAllocator) -> &'a mut E {
+    fn _insert<'a>(&'a mut self, addr: VirtAddr, allocator: &mut FrameAllocator) -> &'a mut E {
         let (new_table, new_addr) = E::alloc_new(allocator);
         // All indexes are 9 bits, and we have a capacity of 512, so this should always succeed.
         let entry = self.get_entry_mut(addr);
@@ -150,7 +150,7 @@ pub trait IntermediatePageTable<E: PageTable>: PageTable {
         new_table
     }
 
-    fn get_mut<'a>(&'a mut self, addr: VirtAddr) -> Option<&'a mut E> {
+    fn _get_mut<'a>(&'a mut self, addr: VirtAddr) -> Option<&'a mut E> {
         // We're masking out 9 bits = 512, so this should always succeed.
         let entry = self.get_entry_mut(addr);
 
@@ -190,7 +190,7 @@ pub struct PageMapLevel4 {
 }
 
 impl PageTable for PageMapLevel4 {
-    fn entries(&self) -> &PageTableEntries {
+    fn _entries(&self) -> &PageTableEntries {
         &self.entries
     }
 
@@ -211,7 +211,7 @@ pub struct PageMapLevel3 {
 }
 
 impl PageTable for PageMapLevel3 {
-    fn entries(&self) -> &PageTableEntries {
+    fn _entries(&self) -> &PageTableEntries {
         &self.entries
     }
 
@@ -232,7 +232,7 @@ pub struct PageMapLevel2 {
 }
 
 impl PageTable for PageMapLevel2 {
-    fn entries(&self) -> &PageTableEntries {
+    fn _entries(&self) -> &PageTableEntries {
         &self.entries
     }
 
@@ -253,7 +253,7 @@ pub struct PageMapLevel1 {
 }
 
 impl PageTable for PageMapLevel1 {
-    fn entries(&self) -> &PageTableEntries {
+    fn _entries(&self) -> &PageTableEntries {
         &self.entries
     }
 

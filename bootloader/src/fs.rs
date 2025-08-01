@@ -76,9 +76,9 @@ pub fn read_file_data(
     Ok(unsafe { slice::from_raw_parts(file_buf, file_size) })
 }
 
-pub fn locate_sfs<'a>(
-    boot_services: &'a BootServices,
-) -> Result<ScopedProtocol<SimpleFileSystem>, uefi::Error> {
+pub fn locate_sfs(
+    boot_services: &BootServices,
+) -> Result<ScopedProtocol<'_, SimpleFileSystem>, uefi::Error> {
     let handle = boot_services.get_handle_for_protocol::<SimpleFileSystem>()?;
     boot_services.open_protocol_exclusive::<SimpleFileSystem>(handle)
 }

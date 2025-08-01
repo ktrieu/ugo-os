@@ -15,10 +15,10 @@ use crate::mappings::Mappings;
 use common::addr::{Address, Page, PhysFrame, VirtPage};
 
 pub struct KernelAddresses {
-    pub kernel_end: VirtAddr,
+    pub _kernel_end: VirtAddr,
     pub kernel_entry: VirtAddr,
     pub stack_top: VirtAddr,
-    pub stack_pages: u64,
+    pub _stack_pages: u64,
 }
 
 pub struct Loader<'a> {
@@ -238,10 +238,10 @@ impl<'a> Loader<'a> {
         let kernel_entry = VirtAddr::new(self.elf_file.header.pt2.entry_point());
 
         let addresses = KernelAddresses {
-            kernel_end,
+            _kernel_end: kernel_end,
             kernel_entry,
             stack_top,
-            stack_pages: KERNEL_STACK_PAGES,
+            _stack_pages: KERNEL_STACK_PAGES,
         };
 
         Ok(addresses)

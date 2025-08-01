@@ -6,9 +6,9 @@ use uefi::{
 
 use font8x8::legacy::BASIC_LEGACY;
 
-pub fn locate_gop<'a>(
-    boot_services: &'a BootServices,
-) -> Result<ScopedProtocol<GraphicsOutput>, uefi::Error> {
+pub fn locate_gop(
+    boot_services: &BootServices,
+) -> Result<ScopedProtocol<'_, GraphicsOutput>, uefi::Error> {
     let handle = boot_services.get_handle_for_protocol::<GraphicsOutput>()?;
     boot_services.open_protocol_exclusive(handle)
 }
@@ -22,7 +22,7 @@ pub struct Framebuffer {
 #[derive(Debug)]
 pub enum FramebufferError {
     NoModes,
-    ModeSetFailed(uefi::Error),
+    ModeSetFailed,
 }
 
 const DESIRED_WIDTH: usize = 1080;
@@ -56,7 +56,7 @@ impl Framebuffer {
         let selected_mode = select_mode(gop.modes())?;
 
         gop.set_mode(&selected_mode)
-            .map_err(|err| FramebufferError::ModeSetFailed(err))?;
+            .map_err(|_| FramebufferError::ModeSetFailed)?;
 
         Ok(Framebuffer {
             addr: gop.frame_buffer().as_mut_ptr(),
