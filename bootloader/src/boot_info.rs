@@ -188,7 +188,7 @@ fn create_mem_regions(
     memory_map: MemoryMap,
     frame_allocator: &mut FrameAllocator,
     boot_info_alloc: &mut BootInfoAllocator,
-) -> &'static mut [MaybeUninit<MemRegion>] {
+) -> (&'static mut [MaybeUninit<MemRegion>], usize) {
     let region_iter = MemRegionIter::new(&memory_map);
     // The frame allocator will fall in one of these
     // We'll have to split that region into two extra pieces to account for that.
@@ -231,7 +231,8 @@ fn create_mem_regions(
         }
     }
 
-    mem_regions
+    // We may not use all the allocated memory. Return the actual length as well.
+    (mem_regions, idx)
 }
 
 fn map_framebuffer(
@@ -304,13 +305,14 @@ pub fn create_boot_info(
 
     framebuffer_info.address = fixup_pointer(framebuffer_offset, framebuffer.addr());
 
-    let mem_regions = create_mem_regions(memory_map, frame_allocator, &mut boot_info_alloc);
+    let (mem_regions, num_regions) =
+        create_mem_regions(memory_map, frame_allocator, &mut boot_info_alloc);
 
     let boot_info = boot_info_alloc.allocate::<BootInfo>();
     boot_info.write(BootInfo {
         mem_regions: MemRegions {
             ptr: fixup_pointer(virtual_offset, mem_regions.as_mut_ptr()) as *mut MemRegion,
-            len: mem_regions.len(),
+            len: num_regions,
         },
         framebuffer: framebuffer_info,
     });
