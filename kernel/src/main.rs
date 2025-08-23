@@ -36,5 +36,9 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     enable_interrupts();
     kprintln!("Interrupts initialized.");
 
+    for r in boot_info.mem_regions.iter() {
+        kprintln!("{}", r)
+    }
+
     loop {}
 }
