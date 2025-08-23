@@ -63,6 +63,14 @@ impl FrameAllocator {
         self.alloc_end.base_addr()
     }
 
+    pub fn reserved_range(&self) -> PageRange<PhysFrame> {
+        PhysFrame::range_exclusive(self.alloc_start, self.alloc_end)
+    }
+
+    pub fn used_range(&self) -> PageRange<PhysFrame> {
+        PhysFrame::range_length(self.alloc_start, self.frames_allocated())
+    }
+
     pub fn frames_allocated(&self) -> u64 {
         (self.next_frame.base_addr().as_u64() - self.alloc_start.base_addr().as_u64()) / PAGE_SIZE
     }

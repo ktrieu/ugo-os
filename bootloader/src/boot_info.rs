@@ -12,7 +12,7 @@ use common::{
 };
 use uefi::{
     proto::console::gop::PixelFormat,
-    table::boot::{MemoryDescriptor, MemoryMap, MemoryType},
+    table::boot::{MemoryDescriptor, MemoryMap, MemoryMapIter, MemoryType},
 };
 
 use crate::{
@@ -143,42 +143,96 @@ fn new_mem_region(descriptor: &MemoryDescriptor) -> MemRegion {
     }
 }
 
+struct MemRegionIter<'map> {
+    entries: Peekable<MemoryMapIter<'map>>,
+}
+
+impl<'map> MemRegionIter<'map> {
+    pub fn new(memory_map: &'map MemoryMap) -> Self {
+        Self {
+            entries: memory_map.entries().peekable(),
+        }
+    }
+}
+
+impl<'map> Iterator for MemRegionIter<'map> {
+    type Item = MemRegion;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Iterate through the underlying memory descriptors, combining memory descriptors of the same type.
+        // Only yield when the type changes.
+
+        let mut region = new_mem_region(self.entries.next()?);
+
+        while let Some(descriptor) = self.entries.peek() {
+            let peek_region = new_mem_region(&descriptor);
+
+            let peek_range = peek_region.as_range();
+            let region_range = region.as_range();
+
+            // If the types are the same and they're contiguous - merge them together.
+            if peek_region.ty == region.ty && region_range.end() == peek_range.first() {
+                region.pages += peek_region.pages;
+            } else {
+                break;
+            }
+
+            let _ = self.entries.next();
+        }
+
+        Some(region)
+    }
+}
+
 fn create_mem_regions(
     memory_map: MemoryMap,
     frame_allocator: &mut FrameAllocator,
     boot_info_alloc: &mut BootInfoAllocator,
-) -> &'static mut [MaybeUninit<MemRegion>] {
-    // Remember, we've split one memory map section into two for the frame allocator.
-    let num_mem_regions = memory_map.entries().len() + 1;
-    let mem_regions = boot_info_alloc.allocate_array::<MemRegion>(num_mem_regions);
+) -> (&'static mut [MaybeUninit<MemRegion>], usize) {
+    let region_iter = MemRegionIter::new(&memory_map);
+    // The frame allocator will fall in one of these
+    // We'll have to split that region into two extra pieces to account for that.
+    let num_regions = region_iter.count() + 2;
+    let mem_regions = boot_info_alloc.allocate_array::<MemRegion>(num_regions);
+
+    let region_iter = MemRegionIter::new(&memory_map);
+
+    let alloc_reserved = frame_allocator.reserved_range();
 
     let mut idx = 0;
-    for entry in memory_map.entries() {
-        if entry.phys_start == frame_allocator.alloc_start().as_u64() {
-            // We need to split this section in half, since we've used some of it to allocate our own memory.
-            let frame_alloc_region = MemRegion {
-                start: frame_allocator.alloc_start().as_u64(),
-                pages: frame_allocator.frames_allocated(),
-                ty: RegionType::Bootloader,
-            };
-            mem_regions[idx].write(frame_alloc_region);
+    for region in region_iter {
+        let region_range = region.as_range();
+        if region_range.contains_range(alloc_reserved) {
+            // We should always allocate our boot memory from a usable region.
+            assert!(region.ty == RegionType::Usable);
+
+            let pre_range =
+                PhysFrame::range_exclusive(region_range.first(), alloc_reserved.first());
+            let post_range = PhysFrame::range_inclusive(alloc_reserved.end(), region_range.last());
+
+            if pre_range.len() > 0 {
+                mem_regions[idx].write(MemRegion::from_range(pre_range, region.ty));
+                idx += 1;
+            }
+
+            mem_regions[idx].write(MemRegion::from_range(
+                frame_allocator.used_range(),
+                RegionType::Bootloader,
+            ));
             idx += 1;
 
-            // And the remaining of this section.
-            let remaining_region = MemRegion {
-                start: frame_allocator.next_frame().base_addr().as_u64(),
-                pages: entry.page_count - frame_allocator.frames_allocated(),
-                ty: RegionType::Usable,
-            };
-            mem_regions[idx].write(remaining_region);
-            idx += 1
+            if post_range.len() > 0 {
+                mem_regions[idx].write(MemRegion::from_range(post_range, region.ty));
+                idx += 1;
+            }
         } else {
-            mem_regions[idx].write(new_mem_region(entry));
+            mem_regions[idx].write(region);
             idx += 1;
         }
     }
 
-    mem_regions
+    // We may not use all the allocated memory. Return the actual length as well.
+    (mem_regions, idx)
 }
 
 fn map_framebuffer(
@@ -251,13 +305,14 @@ pub fn create_boot_info(
 
     framebuffer_info.address = fixup_pointer(framebuffer_offset, framebuffer.addr());
 
-    let mem_regions = create_mem_regions(memory_map, frame_allocator, &mut boot_info_alloc);
+    let (mem_regions, num_regions) =
+        create_mem_regions(memory_map, frame_allocator, &mut boot_info_alloc);
 
     let boot_info = boot_info_alloc.allocate::<BootInfo>();
     boot_info.write(BootInfo {
         mem_regions: MemRegions {
             ptr: fixup_pointer(virtual_offset, mem_regions.as_mut_ptr()) as *mut MemRegion,
-            len: mem_regions.len(),
+            len: num_regions,
         },
         framebuffer: framebuffer_info,
     });
