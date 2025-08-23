@@ -12,7 +12,7 @@ use common::{
 };
 use uefi::{
     proto::console::gop::PixelFormat,
-    table::boot::{MemoryDescriptor, MemoryMap, MemoryType},
+    table::boot::{MemoryDescriptor, MemoryMap, MemoryMapIter, MemoryType},
 };
 
 use crate::{
@@ -189,9 +189,15 @@ fn create_mem_regions(
     frame_allocator: &mut FrameAllocator,
     boot_info_alloc: &mut BootInfoAllocator,
 ) -> &'static mut [MaybeUninit<MemRegion>] {
-    // Remember, we've split one memory map section into two for the frame allocator.
-    let num_mem_regions = memory_map.entries().len() + 1;
-    let mem_regions = boot_info_alloc.allocate_array::<MemRegion>(num_mem_regions);
+    let region_iter = MemRegionIter::new(&memory_map);
+    // The frame allocator will fall in one of these
+    // We'll have to split that region into two extra pieces to account for that.
+    let num_regions = region_iter.count() + 2;
+    let mem_regions = boot_info_alloc.allocate_array::<MemRegion>(num_regions);
+
+    let region_iter = MemRegionIter::new(&memory_map);
+
+    let alloc_reserved = frame_allocator.reserved_range();
 
     let mut idx = 0;
     for region in region_iter {
@@ -215,16 +221,12 @@ fn create_mem_regions(
             ));
             idx += 1;
 
-            // And the remaining of this section.
-            let remaining_region = MemRegion {
-                start: frame_allocator.next_frame().base_addr().as_u64(),
-                pages: entry.page_count - frame_allocator.frames_allocated(),
-                ty: RegionType::Usable,
-            };
-            mem_regions[idx].write(remaining_region);
-            idx += 1
+            if post_range.len() > 0 {
+                mem_regions[idx].write(MemRegion::from_range(post_range, region.ty));
+                idx += 1;
+            }
         } else {
-            mem_regions[idx].write(new_mem_region(entry));
+            mem_regions[idx].write(region);
             idx += 1;
         }
     }

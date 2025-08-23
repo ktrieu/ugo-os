@@ -107,7 +107,8 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
         &file_data[0..4]
     );
 
-    let (_, memory_map) = system_table.exit_boot_services();
+    let (_, mut memory_map) = system_table.exit_boot_services();
+    memory_map.sort();
 
     // DEBUG: Print memory map
     for d in memory_map
