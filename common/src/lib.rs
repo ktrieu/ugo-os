@@ -1,6 +1,11 @@
 #![no_std]
 
-use core::{fmt::Debug, ops, slice};
+use core::{
+    fmt::{Debug, Display},
+    ops, slice,
+};
+
+use crate::addr::{Page, PageRange, PhysFrame};
 
 pub mod addr;
 
@@ -32,11 +37,21 @@ pub const PHYSADDR_SIZE: u8 = 52;
 pub const VIRTADDR_SIZE: u8 = 48;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegionType {
     Usable,
     Allocated,
     Bootloader,
+}
+
+impl Display for RegionType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            RegionType::Usable => write!(f, "RegionType::Usable"),
+            RegionType::Allocated => write!(f, "RegionType::Allocated"),
+            RegionType::Bootloader => write!(f, "RegionType::Bootloader"),
+        }
+    }
 }
 
 #[repr(C)]
@@ -45,6 +60,26 @@ pub struct MemRegion {
     pub start: u64,
     pub pages: u64,
     pub ty: RegionType,
+}
+
+impl MemRegion {
+    pub fn from_range(range: PageRange<PhysFrame>, ty: RegionType) -> Self {
+        Self {
+            start: range.first().base_u64(),
+            pages: range.len(),
+            ty,
+        }
+    }
+
+    pub fn as_range(&self) -> PageRange<PhysFrame> {
+        PhysFrame::range_length(PhysFrame::from_base_u64(self.start), self.pages)
+    }
+}
+
+impl Display for MemRegion {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{} {}", self.as_range(), self.ty)
+    }
 }
 
 #[repr(C)]

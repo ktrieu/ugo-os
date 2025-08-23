@@ -245,6 +245,10 @@ impl<P: Page> PageRange<P> {
         self.end.decrement(1)
     }
 
+    pub fn end(&self) -> P {
+        self.end
+    }
+
     pub fn len(&self) -> u64 {
         (self.end.base_u64() - self.start.base_u64()) / PAGE_SIZE
     }
@@ -253,11 +257,22 @@ impl<P: Page> PageRange<P> {
         page.base_u64() >= self.start.base_u64() && page.base_u64() < self.end.base_u64()
     }
 
+    pub fn contains_range(&self, other: PageRange<P>) -> bool {
+        self.first().base_u64() <= other.first().base_u64()
+            && self.last().base_u64() >= other.last().base_u64()
+    }
+
     pub fn iter(&self) -> PageRangeIter<P> {
         PageRangeIter {
             next: self.start,
             range: *self,
         }
+    }
+}
+
+impl<P: Page + Display> Display for PageRange<P> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{} - {} (length {})", self.start, self.end, self.len())
     }
 }
 
