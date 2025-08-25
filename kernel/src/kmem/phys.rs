@@ -103,11 +103,6 @@ impl PhysFrameAllocator {
 
         Self::initialize_frame_map(&regions, used_frames, slice);
 
-        // Write the first few bytes of the map
-        for b in slice.iter() {
-            kprint!("{:08b}", b);
-        }
-
         Self {}
     }
 }
