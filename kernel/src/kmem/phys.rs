@@ -2,7 +2,7 @@ use core::ptr::slice_from_raw_parts_mut;
 
 use common::{
     addr::{Address, Page, PageRange, PhysAddr, PhysFrame},
-    MemRegions, RegionType, PAGE_SIZE,
+    MemRegions, RegionType,
 };
 pub struct PhysFrameAllocator {}
 
@@ -105,7 +105,7 @@ impl PhysFrameAllocator {
 
         // Write the first few bytes of the map
         for b in slice.iter() {
-            kprintln!("{:08b}", b);
+            kprint!("{:08b}", b);
         }
 
         Self {}
