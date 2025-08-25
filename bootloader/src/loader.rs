@@ -67,7 +67,7 @@ fn phdr_flags_to_mappings_flags(header: &ProgramHeader) -> MappingFlags {
 }
 
 // Doesn't really matter what this is, probably.
-const KERNEL_STACK_PAGES: u64 = 3;
+const KERNEL_STACK_PAGES: u64 = 6;
 
 impl<'a> Loader<'a> {
     pub fn new(kernel_data: &'a [u8]) -> LoaderResult<Self> {
