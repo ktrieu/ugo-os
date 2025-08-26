@@ -60,6 +60,8 @@ impl Bitmap {
 pub struct PhysFrameAllocator {
     bitmap: Bitmap,
     range: PageRange<PhysFrame>,
+
+    allocated: u64,
 }
 
 impl PhysFrameAllocator {
@@ -120,27 +122,36 @@ impl PhysFrameAllocator {
         );
 
         let mut bitmap = Bitmap::new(slice);
+        let mut allocated = 0;
 
         // Mark existing used memory.
         for r in regions.iter() {
             if r.ty != RegionType::Usable {
                 for f in r.as_range().iter() {
-                    bitmap.write(f, FrameStatus::Allocated)
+                    bitmap.write(f, FrameStatus::Allocated);
+                    allocated += 1;
                 }
             }
         }
 
         for f in used_frames.iter() {
             bitmap.write(f, FrameStatus::Allocated);
+            allocated += 1;
         }
 
-        Self { bitmap, range }
+        Self {
+            bitmap,
+            range,
+            allocated,
+        }
     }
 
     pub fn alloc_frame(&mut self) -> Option<PhysFrame> {
         for f in self.range.iter() {
             if matches!(self.bitmap.read(f), FrameStatus::Free) {
                 self.bitmap.write(f, FrameStatus::Allocated);
+                self.allocated += 1;
+
                 return Some(f);
             }
         }
@@ -150,5 +161,14 @@ impl PhysFrameAllocator {
 
     pub fn free_frame(&mut self, frame: PhysFrame) {
         self.bitmap.write(frame, FrameStatus::Free);
+        self.allocated -= 1;
+    }
+
+    pub fn print_stats(&self) {
+        kprintln!(
+            "physical memory: {} / {} frames allocated.",
+            self.allocated,
+            self.range.len()
+        );
     }
 }
