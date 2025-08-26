@@ -4,7 +4,10 @@ use common::{
     addr::{Address, Page, PageRange, PhysAddr, PhysFrame},
     MemRegions, RegionType,
 };
-pub struct PhysFrameAllocator {}
+pub struct PhysFrameAllocator {
+    bitmap: &'static mut [u8],
+    range: PageRange<PhysFrame>,
+}
 
 impl PhysFrameAllocator {
     fn alloc_storage(
@@ -42,6 +45,18 @@ impl PhysFrameAllocator {
         }
     }
 
+    fn read_free(map: &[u8], frame: PhysFrame) -> bool {
+        let byte_idx = (frame.idx() / 8) as usize;
+        let bit_idx = frame.idx() % 8;
+
+        let byte = map[byte_idx];
+
+        let byte = byte >> 7 - bit_idx;
+        let masked = byte & 1;
+
+        masked == 0
+    }
+
     fn write_free(map: &mut [u8], frame: PhysFrame, free: bool) {
         let byte_idx = (frame.idx() / 8) as usize;
         let bit_idx = frame.idx() % 8;
@@ -49,7 +64,7 @@ impl PhysFrameAllocator {
         let byte = map[byte_idx];
 
         if free {
-            // Clear the 7 - bit_idxth bit. We subtract from 8 because
+            // Clear the 7 - bit_idxth bit. We subtract from 7 because
             // we want the 0th bit to be on the left, aka the high bit.
             let mask: u8 = !(1 << (7 - bit_idx));
             map[byte_idx] = byte & mask;
@@ -103,6 +118,26 @@ impl PhysFrameAllocator {
 
         Self::initialize_frame_map(&regions, used_frames, slice);
 
-        Self {}
+        Self {
+            bitmap: slice,
+            range,
+        }
+    }
+
+    pub fn alloc_frame(&mut self) -> Option<PhysFrame> {
+        for f in self.range.iter() {
+            let free = Self::read_free(self.bitmap, f);
+
+            if free {
+                Self::write_free(self.bitmap, f, false);
+                return Some(f);
+            }
+        }
+
+        None
+    }
+
+    pub fn free_frame(&mut self, frame: PhysFrame) {
+        Self::write_free(self.bitmap, frame, true);
     }
 }

@@ -4,7 +4,10 @@
 
 use core::panic::PanicInfo;
 
-use common::BootInfo;
+use common::{
+    addr::{Page, PhysFrame},
+    BootInfo,
+};
 
 use crate::{
     arch::{
@@ -40,7 +43,20 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     enable_interrupts();
     kprintln!("Interrupts initialized.");
 
-    let phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
+    let mut phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
+
+    let mut frames: [PhysFrame; 10] = [PhysFrame::from_base_u64(0); 10];
+
+    for i in 0..10 {
+        frames[i] = phys_allocator
+            .alloc_frame()
+            .expect("allocation should succeed!");
+        kprintln!("{}", frames[i])
+    }
+
+    for i in 0..10 {
+        phys_allocator.free_frame(frames[i]);
+    }
 
     loop {}
 }
