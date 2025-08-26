@@ -6,9 +6,12 @@ use core::panic::PanicInfo;
 
 use common::BootInfo;
 
-use crate::arch::{
-    gdt::initialize_gdt,
-    interrupts::{enable_interrupts, idt::initialize_idt, pic::initialize_pic},
+use crate::{
+    arch::{
+        gdt::initialize_gdt,
+        interrupts::{enable_interrupts, idt::initialize_idt, pic::initialize_pic},
+    },
+    kmem::phys::PhysFrameAllocator,
 };
 
 #[macro_use]
@@ -16,6 +19,7 @@ mod kprintln;
 
 mod arch;
 mod framebuffer;
+mod kmem;
 mod sync;
 
 #[panic_handler]
@@ -36,9 +40,8 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     enable_interrupts();
     kprintln!("Interrupts initialized.");
 
-    for r in boot_info.mem_regions.iter() {
-        kprintln!("{}", r)
-    }
+    let phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
+    phys_allocator.print_stats();
 
     loop {}
 }

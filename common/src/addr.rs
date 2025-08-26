@@ -1,6 +1,6 @@
 use core::fmt::Display;
 
-use crate::{PAGE_SIZE, PHYSADDR_SIZE, VIRTADDR_SIZE};
+use crate::{PAGE_SIZE, PHYSADDR_SIZE, PHYSMEM_START, VIRTADDR_SIZE};
 
 pub fn align_down(addr: u64, align: u64) -> u64 {
     if !align.is_power_of_two() {
@@ -50,7 +50,7 @@ where
     }
 }
 
-#[derive(PartialEq, PartialOrd, Clone, Copy)]
+#[derive(PartialEq, PartialOrd, Clone, Copy, Eq, Ord)]
 pub struct PhysAddr(u64);
 
 impl Address for PhysAddr {
@@ -72,13 +72,19 @@ impl Address for PhysAddr {
     }
 }
 
+impl PhysAddr {
+    pub fn as_direct_mapped(&self) -> VirtAddr {
+        VirtAddr::new(self.0 + PHYSMEM_START)
+    }
+}
+
 impl Display for PhysAddr {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "0x{:016x}", self.0)
     }
 }
 
-#[derive(PartialEq, PartialOrd, Clone, Copy)]
+#[derive(PartialEq, PartialOrd, Clone, Copy, Eq, Ord)]
 pub struct VirtAddr(u64);
 
 impl VirtAddr {
@@ -158,6 +164,10 @@ where
     fn from_base_addr(addr: Self::A) -> Self;
     fn base_addr(&self) -> Self::A;
 
+    fn idx(&self) -> u64 {
+        self.base_u64() / PAGE_SIZE
+    }
+
     fn from_containing_addr(addr: Self::A) -> Self {
         let aligned = addr.align_down(PAGE_SIZE);
 
@@ -224,7 +234,7 @@ where
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PageRange<P: Page + Copy> {
     // Inclusive lower bound.
     start: P,
@@ -251,6 +261,10 @@ impl<P: Page> PageRange<P> {
 
     pub fn len(&self) -> u64 {
         (self.end.base_u64() - self.start.base_u64()) / PAGE_SIZE
+    }
+
+    pub fn len_bytes(&self) -> u64 {
+        self.end.base_u64() - self.start.base_u64()
     }
 
     pub fn contains(&self, page: P) -> bool {
@@ -297,7 +311,7 @@ impl<P: Page> Iterator for PageRangeIter<P> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct PhysFrame(PhysAddr);
 
 impl PhysFrame {
@@ -329,7 +343,7 @@ impl Display for PhysFrame {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct VirtPage(VirtAddr);
 
 impl Page for VirtPage {
