@@ -1,11 +1,64 @@
-use core::ptr::slice_from_raw_parts_mut;
+use core::ptr::{slice_from_raw_parts_mut, write_bytes};
 
 use common::{
     addr::{Address, Page, PageRange, PhysAddr, PhysFrame},
     MemRegions, RegionType,
 };
+
+enum FrameStatus {
+    Allocated,
+    Free,
+}
+
+struct Bitmap {
+    map: &'static mut [u8],
+}
+
+impl Bitmap {
+    fn new(map: &'static mut [u8]) -> Self {
+        Self { map }
+    }
+
+    fn write(&mut self, frame: PhysFrame, status: FrameStatus) {
+        let byte_idx = (frame.idx() / 8) as usize;
+        let bit_idx = frame.idx() % 8;
+
+        let byte = self.map[byte_idx];
+
+        match status {
+            FrameStatus::Allocated => {
+                // Set the correct bit.
+                let mask: u8 = 1 << (7 - bit_idx);
+                self.map[byte_idx] = byte | mask;
+            }
+            FrameStatus::Free => {
+                // Clear the 7 - bit_idxth bit. We subtract from 7 because
+                // we want the 0th bit to be on the left, aka the high bit.
+                let mask: u8 = !(1 << (7 - bit_idx));
+                self.map[byte_idx] = byte & mask
+            }
+        }
+    }
+
+    fn read(&self, frame: PhysFrame) -> FrameStatus {
+        let byte_idx = (frame.idx() / 8) as usize;
+        let bit_idx = frame.idx() % 8;
+
+        let byte = self.map[byte_idx];
+
+        let byte = byte >> 7 - bit_idx;
+        let masked = byte & 1;
+
+        if masked == 0 {
+            FrameStatus::Free
+        } else {
+            FrameStatus::Allocated
+        }
+    }
+}
+
 pub struct PhysFrameAllocator {
-    bitmap: &'static mut [u8],
+    bitmap: Bitmap,
     range: PageRange<PhysFrame>,
 }
 
@@ -29,12 +82,15 @@ impl PhysFrameAllocator {
 
         // Safety: This memory is usable for allocation because it comes from a region marked usable in the map.
         unsafe {
+            let ptr = start_phys.as_direct_mapped().as_u8_ptr_mut();
+            let len = required_bytes as usize;
+
+            write_bytes(ptr, 0, len);
+
             // We keep physical addresses for later bookkeeping, but the actual address we use needs to be virtual.
             // Just use direct mapping for now.
-            let slice = slice_from_raw_parts_mut(
-                start_phys.as_direct_mapped().as_u8_ptr_mut(),
-                required_bytes as usize,
-            );
+            let slice =
+                slice_from_raw_parts_mut(start_phys.as_direct_mapped().as_u8_ptr_mut(), len);
 
             let phys_range = PhysFrame::range_inclusive(
                 PhysFrame::from_containing_addr(start_phys),
@@ -42,59 +98,6 @@ impl PhysFrameAllocator {
             );
 
             (&mut *slice, phys_range)
-        }
-    }
-
-    fn read_free(map: &[u8], frame: PhysFrame) -> bool {
-        let byte_idx = (frame.idx() / 8) as usize;
-        let bit_idx = frame.idx() % 8;
-
-        let byte = map[byte_idx];
-
-        let byte = byte >> 7 - bit_idx;
-        let masked = byte & 1;
-
-        masked == 0
-    }
-
-    fn write_free(map: &mut [u8], frame: PhysFrame, free: bool) {
-        let byte_idx = (frame.idx() / 8) as usize;
-        let bit_idx = frame.idx() % 8;
-
-        let byte = map[byte_idx];
-
-        if free {
-            // Clear the 7 - bit_idxth bit. We subtract from 7 because
-            // we want the 0th bit to be on the left, aka the high bit.
-            let mask: u8 = !(1 << (7 - bit_idx));
-            map[byte_idx] = byte & mask;
-        } else {
-            // Set the correct bit.
-            let mask: u8 = 1 << (7 - bit_idx);
-            map[byte_idx] = byte | mask;
-        }
-    }
-
-    fn initialize_frame_map(
-        regions: &MemRegions,
-        storage_range: PageRange<PhysFrame>,
-        map: &mut [u8],
-    ) {
-        // Zero all the storage (i.e., set everything to free)
-        for b in map.iter_mut() {
-            *b = 0;
-        }
-
-        for r in regions.iter() {
-            if r.ty != RegionType::Usable {
-                for f in r.as_range().iter() {
-                    Self::write_free(map, f, false);
-                }
-            }
-        }
-
-        for frame in storage_range.iter() {
-            Self::write_free(map, frame, false);
         }
     }
 
@@ -116,20 +119,28 @@ impl PhysFrameAllocator {
             used_frames
         );
 
-        Self::initialize_frame_map(&regions, used_frames, slice);
+        let mut bitmap = Bitmap::new(slice);
 
-        Self {
-            bitmap: slice,
-            range,
+        // Mark existing used memory.
+        for r in regions.iter() {
+            if r.ty != RegionType::Usable {
+                for f in r.as_range().iter() {
+                    bitmap.write(f, FrameStatus::Allocated)
+                }
+            }
         }
+
+        for f in used_frames.iter() {
+            bitmap.write(f, FrameStatus::Allocated);
+        }
+
+        Self { bitmap, range }
     }
 
     pub fn alloc_frame(&mut self) -> Option<PhysFrame> {
         for f in self.range.iter() {
-            let free = Self::read_free(self.bitmap, f);
-
-            if free {
-                Self::write_free(self.bitmap, f, false);
+            if matches!(self.bitmap.read(f), FrameStatus::Free) {
+                self.bitmap.write(f, FrameStatus::Allocated);
                 return Some(f);
             }
         }
@@ -138,6 +149,6 @@ impl PhysFrameAllocator {
     }
 
     pub fn free_frame(&mut self, frame: PhysFrame) {
-        Self::write_free(self.bitmap, frame, true);
+        self.bitmap.write(frame, FrameStatus::Free);
     }
 }
