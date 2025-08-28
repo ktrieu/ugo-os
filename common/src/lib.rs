@@ -8,6 +8,7 @@ use core::{
 use crate::addr::{Page, PageRange, PhysFrame};
 
 pub mod addr;
+pub mod page;
 
 // The end of the x86-64 low canonical addresses. This marks the end of userspace memory.
 pub const UMEM_END: u64 = 0x0000_7FFF_FFFF_FFFF;
