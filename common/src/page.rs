@@ -2,7 +2,7 @@
  * memory. The kernel will probably use a better version of this code, which is why this is separate.
  */
 
-use core::{fmt::Display, marker::PhantomData};
+use core::fmt::Display;
 
 use crate::{
     addr::{Address, Page, PhysAddr, PhysFrame, VirtAddr},
@@ -96,14 +96,20 @@ impl Display for PageTableEntry {
     }
 }
 
-const NUM_PAGE_TABLE_ENTRIES: usize = 512;
-type PageTableEntries = [PageTableEntry; NUM_PAGE_TABLE_ENTRIES];
+// Safety: The implementation must return a free, usable frame of memory
+pub unsafe trait PageMapAllocator {
+    fn alloc(&mut self) -> PhysFrame;
+}
 
 // Safety: The implementation of Mapper must return a virtual address mapped
 // to the passed physical address.
-unsafe trait Mapper {
+pub unsafe trait Mapper {
     fn to_table_virt_addr(phys_addr: PhysAddr) -> VirtAddr;
 }
+
+const NUM_PAGE_TABLE_ENTRIES: usize = 512;
+
+pub type PageTableEntries = [PageTableEntry; NUM_PAGE_TABLE_ENTRIES];
 
 pub trait PageTable<M: Mapper>: Sized {
     fn _entries(&self) -> &PageTableEntries;
@@ -120,6 +126,17 @@ pub trait PageTable<M: Mapper>: Sized {
         self.entries_mut()
             .get_mut(Self::get_entry_idx(addr))
             .expect("Page entry index out of range!")
+    }
+
+    fn alloc_new<'a, A: PageMapAllocator>(allocator: &mut A) -> (&'a mut Self, PhysAddr) {
+        let frame = allocator.alloc();
+
+        // From the safety condition on PageMapAllocator, this frame of memory is safe to
+        // use as a page table.
+        let table = unsafe { Self::from_frame(frame) };
+        table.clear();
+
+        (table, frame.base_addr())
     }
 
     // Safety: addr must point to a frame that contains a valid page table.
@@ -144,10 +161,15 @@ pub trait IntermediatePageTable<E: PageTable<M>, M: Mapper>: PageTable<M> {
         }
     }
 
-    // Safety: allocated must point to a free, usable frame.
-    unsafe fn insert<'a>(&'a mut self, addr: VirtAddr, allocated: PhysFrame) -> &'a mut E {
+    fn insert<'a, A: PageMapAllocator>(
+        &'a mut self,
+        addr: VirtAddr,
+        allocator: &mut A,
+    ) -> &'a mut E {
+        let allocated = allocator.alloc();
+
         // Safety: An intermediate page table can fit into the one valid frame `allocated`.
-        // The table is cleared to a vlaid stae
+        // The table is cleared to a valid state.
         let reference = unsafe {
             let ptr = allocated.base_u64() as *mut E;
             let reference = &mut *ptr;
@@ -166,90 +188,29 @@ pub trait IntermediatePageTable<E: PageTable<M>, M: Mapper>: PageTable<M> {
 
         reference
     }
-}
 
-#[repr(transparent)]
-pub struct PageMapLevel4<M: Mapper> {
-    entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
-    _marker: PhantomData<M>,
-}
+    fn get_mut_or_insert<'a, A: PageMapAllocator>(
+        &'a mut self,
+        addr: VirtAddr,
+        allocator: &mut A,
+    ) -> &'a mut E {
+        // We're masking out 9 bits = 512, so this should always succeed.
+        let entry = self.get_entry_mut(addr);
 
-impl<M: Mapper> PageTable<M> for PageMapLevel4<M> {
-    fn _entries(&self) -> &PageTableEntries {
-        &self.entries
-    }
+        if entry.present() {
+            let frame = PhysFrame::from_base_addr(entry.addr());
+            // Safety: The only way to insert an address into the table is via
+            // insert, which always inserts a valid address from PageMapAllocator.
+            unsafe { E::from_frame(frame) }
+        } else {
+            let (new_table, new_addr) = E::alloc_new(allocator);
+            entry.set_addr(new_addr);
+            entry.set_present(true);
+            // Set all intermediate page tables to allow writes - we'll control write access
+            // through individual, bottom level page table entries.
+            entry.set_write(true);
 
-    fn entries_mut(&mut self) -> &mut PageTableEntries {
-        &mut self.entries
-    }
-
-    fn get_entry_idx(addr: VirtAddr) -> usize {
-        addr.get_page_map_l4_idx() as usize
-    }
-}
-
-impl<M: Mapper> IntermediatePageTable<PageMapLevel3<M>, M> for PageMapLevel4<M> {}
-
-#[repr(transparent)]
-pub struct PageMapLevel3<M: Mapper> {
-    entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
-    _market: PhantomData<M>,
-}
-
-impl<M: Mapper> PageTable<M> for PageMapLevel3<M> {
-    fn _entries(&self) -> &PageTableEntries {
-        &self.entries
-    }
-
-    fn entries_mut(&mut self) -> &mut PageTableEntries {
-        &mut self.entries
-    }
-
-    fn get_entry_idx(addr: VirtAddr) -> usize {
-        addr.get_page_dir_ptr_idx() as usize
-    }
-}
-
-impl<M: Mapper> IntermediatePageTable<PageMapLevel2<M>, M> for PageMapLevel3<M> {}
-
-#[repr(transparent)]
-pub struct PageMapLevel2<M: Mapper> {
-    entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
-    _marker: PhantomData<M>,
-}
-
-impl<M: Mapper> PageTable<M> for PageMapLevel2<M> {
-    fn _entries(&self) -> &PageTableEntries {
-        &self.entries
-    }
-
-    fn entries_mut(&mut self) -> &mut PageTableEntries {
-        &mut self.entries
-    }
-
-    fn get_entry_idx(addr: VirtAddr) -> usize {
-        addr.get_page_dir_idx() as usize
-    }
-}
-
-impl<M: Mapper> IntermediatePageTable<PageMapLevel1<M>, M> for PageMapLevel2<M> {}
-
-#[repr(transparent)]
-pub struct PageMapLevel1<M: Mapper> {
-    entries: [PageTableEntry; NUM_PAGE_TABLE_ENTRIES],
-    _marker: PhantomData<M>,
-}
-
-impl<M: Mapper> PageTable<M> for PageMapLevel1<M> {
-    fn _entries(&self) -> &PageTableEntries {
-        &self.entries
-    }
-
-    fn entries_mut(&mut self) -> &mut PageTableEntries {
-        &mut self.entries
-    }
-
-    fn get_entry_idx(addr: VirtAddr) -> usize {
-        addr.get_page_table_idx() as usize
+            new_table
+        }
     }
 }

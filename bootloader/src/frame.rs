@@ -1,4 +1,4 @@
-use common::PAGE_SIZE;
+use common::{page::PageMapAllocator, PAGE_SIZE};
 use uefi::table::boot::{MemoryMap, MemoryType};
 
 use common::addr::{Address, Page, PageRange, PhysAddr, PhysFrame};
@@ -77,5 +77,11 @@ impl FrameAllocator {
 
     pub fn next_frame(&self) -> PhysFrame {
         self.next_frame
+    }
+}
+
+unsafe impl PageMapAllocator for FrameAllocator {
+    fn alloc(&mut self) -> PhysFrame {
+        self.alloc_frame()
     }
 }
