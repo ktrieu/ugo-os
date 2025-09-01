@@ -1,13 +1,13 @@
 use common::{
     addr::{Page, PageRange, PhysAddr, PhysFrame, VirtPage},
+    page::{IntermediatePageTable, PageTable, PageTableEntry},
     PHYSMEM_START,
 };
 use uefi::table::boot::MemoryMap;
 
 use crate::{
     frame::FrameAllocator,
-    page::{IntermediatePageTable, PageMapLevel4, PageTableEntry},
-    page::{PageMapLevel1, PageTable},
+    page::{BootPageMapLevel1, BootPageMapLevel4},
 };
 
 #[derive(Clone, Copy)]
@@ -60,7 +60,7 @@ impl MappingFlags {
 fn map_page_entry(
     frame: PhysFrame,
     page: VirtPage,
-    table: &mut PageMapLevel1,
+    table: &mut BootPageMapLevel1,
     flags: MappingFlags,
 ) {
     let entry = table.get_entry_mut(page.base_addr());
@@ -71,13 +71,13 @@ fn map_page_entry(
 }
 
 pub struct Mappings<'a> {
-    level_4_map: &'a mut PageMapLevel4,
+    level_4_map: &'a mut BootPageMapLevel4,
     level_4_phys_addr: PhysAddr,
 }
 
 impl<'a> Mappings<'a> {
     pub fn new(allocator: &mut FrameAllocator) -> Self {
-        let (level_4_map, level_4_phys_addr) = PageMapLevel4::alloc_new(allocator);
+        let (level_4_map, level_4_phys_addr) = BootPageMapLevel4::alloc_new(allocator);
         Mappings {
             level_4_map,
             level_4_phys_addr,
