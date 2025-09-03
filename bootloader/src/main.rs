@@ -152,12 +152,12 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
 
     bootlog!("Kernel entrypoint: {}", addresses.kernel_entry);
 
-    // jump_to_kernel(
-    //     page_mappings.level_4_phys_addr().as_u64(),
-    //     addresses.stack_top.as_u64(),
-    //     addresses.kernel_entry.as_u64(),
-    //     boot_info_ptr,
-    // );
+    jump_to_kernel(
+        page_mappings.level_4_phys_addr().as_u64(),
+        addresses.stack_top.as_u64(),
+        addresses.kernel_entry.as_u64(),
+        boot_info_ptr,
+    );
 
     loop {}
 }
