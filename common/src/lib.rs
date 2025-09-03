@@ -37,6 +37,11 @@ pub const PHYSADDR_SIZE: u8 = 52;
 // This is the number of bits that are used in a virtual address. The upper bits must be sign-extended.
 pub const VIRTADDR_SIZE: u8 = 48;
 
+// Size of the memory covered by a 1 GB huge page.
+pub const HUGE_PAGE_SIZE_BYTES: u64 = 1024 * 1024 * 1024;
+// How many normal 4K pages fit in a 1 GB huge page.
+pub const HUGE_PAGE_SIZE_PAGES: u64 = HUGE_PAGE_SIZE_BYTES / PAGE_SIZE;
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegionType {
