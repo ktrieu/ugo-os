@@ -110,19 +110,6 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     let (_, mut memory_map) = system_table.exit_boot_services();
     memory_map.sort();
 
-    // DEBUG: Print memory map
-    for d in memory_map
-        .entries()
-        .filter(|d| d.ty == MemoryType::CONVENTIONAL)
-    {
-        bootlog!(
-            "({:#016x}-{:#016x}) {:?}",
-            d.phys_start,
-            d.phys_start + (PAGE_SIZE * d.page_count),
-            d.ty,
-        )
-    }
-
     let mut frame_allocator = FrameAllocator::new(&memory_map, MIN_BOOT_PHYS_FRAMES);
     bootlog!(
         "Reserved physical memory for boot. ({}-{})",
