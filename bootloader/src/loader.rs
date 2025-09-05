@@ -2,6 +2,7 @@ use core::cmp::max;
 use core::fmt::Display;
 use core::ptr::{copy_nonoverlapping, write_bytes};
 
+use common::KernelAddresses;
 use common::{
     addr::{PhysAddr, VirtAddr},
     KERNEL_START, PAGE_SIZE,
@@ -13,13 +14,6 @@ use crate::frame::FrameAllocator;
 use crate::mappings::MappingFlags;
 use crate::mappings::Mappings;
 use common::addr::{Address, Page, PhysFrame, VirtPage};
-
-pub struct KernelAddresses {
-    pub _kernel_end: VirtAddr,
-    pub kernel_entry: VirtAddr,
-    pub stack_top: VirtAddr,
-    pub _stack_pages: u64,
-}
 
 pub struct Loader<'a> {
     kernel_phys_offset: PhysAddr,
@@ -238,10 +232,10 @@ impl<'a> Loader<'a> {
         let kernel_entry = VirtAddr::new(self.elf_file.header.pt2.entry_point());
 
         let addresses = KernelAddresses {
-            _kernel_end: kernel_end,
+            kernel_end,
             kernel_entry,
             stack_top,
-            _stack_pages: KERNEL_STACK_PAGES,
+            stack_pages: KERNEL_STACK_PAGES,
         };
 
         Ok(addresses)

@@ -7,8 +7,8 @@ use core::{
 
 use common::{
     addr::{Address, Page, PageRange, PageRangeIter, PhysAddr, PhysFrame, VirtPage},
-    BootInfo, FramebufferFormat, FramebufferInfo, MemRegion, MemRegions, RegionType, BOOTINFO_SIZE,
-    BOOTINFO_START, PAGE_SIZE,
+    BootInfo, FramebufferFormat, FramebufferInfo, KernelAddresses, MemRegion, MemRegions,
+    RegionType, BOOTINFO_SIZE, BOOTINFO_START, PAGE_SIZE,
 };
 use uefi::{
     proto::console::gop::PixelFormat,
@@ -274,6 +274,7 @@ fn fixup_pointer<T>(virtual_offset: u64, pointer: *mut T) -> *mut T {
 pub fn create_boot_info(
     frame_allocator: &mut FrameAllocator,
     mappings: &mut Mappings,
+    addresses: KernelAddresses,
     framebuffer: &Framebuffer,
     memory_map: MemoryMap,
 ) -> *mut BootInfo {
@@ -315,6 +316,7 @@ pub fn create_boot_info(
             len: num_regions,
         },
         framebuffer: framebuffer_info,
+        kernel_addrs: addresses,
     });
 
     // Safety: We just initialized it.

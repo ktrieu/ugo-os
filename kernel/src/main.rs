@@ -33,6 +33,7 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     kprintln::init_kprintln(&boot_info.framebuffer);
 
     kprintln!("Hello from UgoOS.");
+    kprintln!("{}", boot_info.kernel_addrs);
 
     initialize_gdt();
     initialize_idt();

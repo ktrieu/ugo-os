@@ -4,8 +4,8 @@
 use core::arch::asm;
 use core::panic::PanicInfo;
 
-use common::BootInfo;
-use loader::{KernelAddresses, LoaderResult};
+use common::{BootInfo, KernelAddresses};
+use loader::LoaderResult;
 use uefi::prelude::*;
 
 #[macro_use]
@@ -131,6 +131,7 @@ fn uefi_main(handle: Handle, system_table: SystemTable<Boot>) -> Status {
     let boot_info_ptr = create_boot_info(
         &mut frame_allocator,
         &mut page_mappings,
+        addresses,
         &framebuffer,
         memory_map,
     );

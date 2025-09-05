@@ -5,7 +5,7 @@ use core::{
     ops, slice,
 };
 
-use crate::addr::{Page, PageRange, PhysFrame};
+use crate::addr::{Page, PageRange, PhysFrame, VirtAddr};
 
 pub mod addr;
 pub mod page;
@@ -124,8 +124,37 @@ pub struct FramebufferInfo {
     pub height: usize,
 }
 
+/**
+ * The kernel virtual addresses are laid out like:
+ * `start`
+ *  - kernel code/data
+ * `end`
+ *  - guard_page
+ *  - empty pages
+ * `stack_start`
+ */
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct KernelAddresses {
+    pub kernel_end: VirtAddr,
+    pub kernel_entry: VirtAddr,
+    pub stack_top: VirtAddr,
+    pub stack_pages: u64,
+}
+
+impl Display for KernelAddresses {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "Kernel: end {}, entry {}. Stack: top {}, {} pages",
+            self.kernel_end, self.kernel_entry, self.stack_top, self.stack_pages
+        )
+    }
+}
+
 #[repr(C)]
 pub struct BootInfo {
     pub mem_regions: MemRegions,
+    pub kernel_addrs: KernelAddresses,
     pub framebuffer: FramebufferInfo,
 }
