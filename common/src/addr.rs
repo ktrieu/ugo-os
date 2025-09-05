@@ -157,7 +157,7 @@ impl Display for VirtAddr {
 // A virtual page/physical frame.
 pub trait Page
 where
-    Self: Sized + Copy,
+    Self: Sized + Copy + Eq,
 {
     type A: Address;
 
@@ -259,6 +259,10 @@ impl<P: Page> PageRange<P> {
         self.end
     }
 
+    pub fn empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn len(&self) -> u64 {
         (self.end.base_u64() - self.start.base_u64()) / PAGE_SIZE
     }
@@ -274,6 +278,35 @@ impl<P: Page> PageRange<P> {
     pub fn contains_range(&self, other: PageRange<P>) -> bool {
         self.first().base_u64() <= other.first().base_u64()
             && self.last().base_u64() >= other.last().base_u64()
+    }
+
+    // Splits a range into three pieces: a middle range aligned to `align` increments of pages,
+    // and a begin/end range containing the remaining space.
+    // Will return None for begin/end if they are empty.
+    pub fn aligned_range(&self, align_pages: u64) -> (Option<Self>, Option<Self>, Option<Self>) {
+        // If this range is less pages than align, return ourselves as start and nothing else.
+        if self.len() < align_pages {
+            return (Some(*self), None, None);
+        }
+
+        let start_idx = self.start.idx().div_ceil(align_pages) * align_pages;
+        let end_idx = (self.end.idx() / align_pages) * align_pages;
+
+        let aligned_start = start_idx * PAGE_SIZE;
+        let aligned_end = end_idx * PAGE_SIZE;
+
+        let begin = Self::new(self.start, P::from_base_u64(aligned_start));
+        let middle = Self::new(
+            P::from_base_u64(aligned_start),
+            P::from_base_u64(aligned_end),
+        );
+        let end = Self::new(P::from_base_u64(aligned_end), self.end);
+
+        let begin = if !begin.empty() { Some(begin) } else { None };
+        let middle = if !middle.empty() { Some(middle) } else { None };
+        let end = if !end.empty() { Some(end) } else { None };
+
+        (begin, middle, end)
     }
 
     pub fn iter(&self) -> PageRangeIter<P> {
@@ -317,6 +350,10 @@ pub struct PhysFrame(PhysAddr);
 impl PhysFrame {
     pub fn to_virt_page(&self, offset: u64) -> VirtPage {
         VirtPage::from_base_u64(self.0.as_u64() + offset)
+    }
+
+    pub fn as_direct_mapped(&self) -> VirtPage {
+        self.to_virt_page(PHYSMEM_START)
     }
 }
 

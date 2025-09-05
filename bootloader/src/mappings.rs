@@ -1,7 +1,7 @@
 use common::{
     addr::{Page, PageRange, PhysAddr, PhysFrame, VirtPage},
     page::{IntermediatePageTable, PageTable, PageTableEntry},
-    PHYSMEM_START,
+    HUGE_PAGE_SIZE_BYTES, HUGE_PAGE_SIZE_PAGES,
 };
 use uefi::table::boot::MemoryMap;
 
@@ -127,28 +127,17 @@ impl<'a> Mappings<'a> {
         frames
     }
 
-    pub fn map_physical_memory(&mut self, memory_map: &MemoryMap, allocator: &mut FrameAllocator) {
-        let highest_segment = memory_map
-            .entries()
-            .max_by_key(|descriptor| descriptor.phys_start)
-            .expect("Memory map was empty!");
+    fn direct_map_range(
+        &mut self,
+        frame_range: PageRange<PhysFrame>,
+        allocator: &mut FrameAllocator,
+    ) {
+        let start_page = frame_range.first().as_direct_mapped();
+        let end_page = frame_range.end().as_direct_mapped();
 
-        let start_frame = PhysFrame::from_base_u64(0);
-        let end_frame = PhysFrame::from_base_u64(highest_segment.phys_start)
-            .increment(highest_segment.page_count);
-        let frame_range = PhysFrame::range_inclusive(start_frame, end_frame);
+        let page_range = VirtPage::range_exclusive(start_page, end_page);
 
-        let start_page = start_frame.to_virt_page(PHYSMEM_START);
-        let end_page = end_frame.to_virt_page(PHYSMEM_START);
-        let page_range = VirtPage::range_inclusive(start_page, end_page);
-
-        bootlog!(
-            "Mapping all physical memory.\n{} - {}\n{} - {}",
-            start_frame,
-            end_frame,
-            start_page,
-            end_page
-        );
+        bootlog!("Direct mapping range:\n {} -> {}", frame_range, page_range);
 
         self.map_page_range(
             frame_range,
@@ -156,6 +145,74 @@ impl<'a> Mappings<'a> {
             allocator,
             MappingFlags::new_rw_data(),
         );
+    }
+
+    fn direct_map_huge_page(
+        &mut self,
+        frame_range: PageRange<PhysFrame>,
+        allocator: &mut FrameAllocator,
+    ) {
+        let start_page = frame_range.first().as_direct_mapped();
+        let end_page = frame_range.end().as_direct_mapped();
+
+        let page_range = VirtPage::range_exclusive(start_page, end_page);
+
+        // Make sure everything is aligned correctly.
+        assert!(frame_range.first().base_u64() % HUGE_PAGE_SIZE_BYTES == 0);
+        assert!(frame_range.end().base_u64() % HUGE_PAGE_SIZE_BYTES == 0);
+
+        assert!(page_range.first().base_u64() % HUGE_PAGE_SIZE_BYTES == 0);
+        assert!(page_range.end().base_u64() % HUGE_PAGE_SIZE_BYTES == 0);
+
+        bootlog!(
+            "Direct mapping with huge pages: {} - {}",
+            frame_range,
+            page_range
+        );
+
+        let frame_iter = frame_range.iter().step_by(HUGE_PAGE_SIZE_PAGES as usize);
+        let page_iter = page_range.iter().step_by(HUGE_PAGE_SIZE_PAGES as usize);
+
+        for (frame, page) in frame_iter.zip(page_iter) {
+            bootlog!("Mapping 1GB page {} - {}", frame, page);
+            let level_3_map = self
+                .level_4_map
+                .get_mut_or_insert(page.base_addr(), allocator);
+
+            let new_entry = level_3_map.get_entry_mut(page.base_addr());
+
+            new_entry.set_no_exec(true);
+            new_entry.set_write(true);
+            new_entry.set_present(true);
+            new_entry.set_page_size(true);
+            new_entry.set_addr(frame.base_addr());
+        }
+    }
+
+    pub fn map_physical_memory(&mut self, memory_map: &MemoryMap, allocator: &mut FrameAllocator) {
+        let highest_segment = memory_map
+            .entries()
+            .max_by_key(|descriptor| descriptor.phys_start)
+            .expect("Memory map was empty!");
+
+        let start_frame = PhysFrame::from_base_u64(0);
+        let last_frame = PhysFrame::from_base_u64(highest_segment.phys_start)
+            .increment(highest_segment.page_count);
+        let frame_range = PhysFrame::range_exclusive(start_frame, last_frame);
+
+        let (start, middle, end) = frame_range.aligned_range(HUGE_PAGE_SIZE_PAGES);
+
+        if let Some(start) = start {
+            self.direct_map_range(start, allocator);
+        };
+
+        if let Some(middle) = middle {
+            self.direct_map_huge_page(middle, allocator);
+        };
+
+        if let Some(end) = end {
+            self.direct_map_range(end, allocator);
+        };
     }
 
     // fn_ptr should be derived from a function, but I can't have a "pointer to any function"

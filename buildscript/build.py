@@ -96,6 +96,8 @@ def run_qemu(debug=False):
         "none",
         "-drive",
         f"file=fat:rw:{get_bootimg_path()},format=raw",
+        "-m",
+        "2G",
         "-monitor",
         "stdio",
         "-D",

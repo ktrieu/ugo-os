@@ -18,6 +18,10 @@ pub struct PageTableEntry {
 impl PageTableEntry {
     const PRESENT_IDX: u8 = 0;
     const WRITE_IDX: u8 = 1;
+    // This is technically not the page size bit for all levels of the paging structures.
+    // Pending a rewrite to use a different type for each level of paging entry, we will just
+    // pinky promise not to use it at the wrong level.
+    const PAGE_SIZE_IDX: u8 = 7;
     const NO_EXEC_IDX: u8 = 63;
     const ADDR_IDX: u8 = 12;
     const ADDR_SIZE: u8 = PHYSADDR_SIZE - PageTableEntry::ADDR_IDX;
@@ -52,6 +56,14 @@ impl PageTableEntry {
 
     pub fn set_no_exec(&mut self, no_exec: bool) {
         self.set_flag(no_exec, PageTableEntry::NO_EXEC_IDX);
+    }
+
+    pub fn page_size(&self) -> bool {
+        self.get_flag(PageTableEntry::PAGE_SIZE_IDX)
+    }
+
+    pub fn set_page_size(&mut self, page_size: bool) {
+        self.set_flag(page_size, PageTableEntry::PAGE_SIZE_IDX);
     }
 
     pub fn addr(&self) -> PhysAddr {
