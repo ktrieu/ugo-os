@@ -4,7 +4,7 @@
 use core::arch::asm;
 use core::panic::PanicInfo;
 
-use common::{BootInfo, PAGE_SIZE};
+use common::BootInfo;
 use loader::{KernelAddresses, LoaderResult};
 use uefi::prelude::*;
 
@@ -18,8 +18,6 @@ mod graphics;
 mod loader;
 mod mappings;
 mod page;
-
-use uefi::table::boot::MemoryType;
 
 use crate::boot_info::create_boot_info;
 use crate::frame::FrameAllocator;
