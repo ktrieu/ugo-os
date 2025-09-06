@@ -15,7 +15,7 @@ unsafe impl Mapper for IdentityMapper {
 pub struct BootPageMapLevel1(PageTableEntries);
 
 impl PageTable<IdentityMapper> for BootPageMapLevel1 {
-    fn _entries(&self) -> &PageTableEntries {
+    fn entries(&self) -> &PageTableEntries {
         &self.0
     }
 
@@ -33,7 +33,7 @@ impl IntermediatePageTable<BootPageMapLevel1, IdentityMapper> for BootPageMapLev
 pub struct BootPageMapLevel2(PageTableEntries);
 
 impl PageTable<IdentityMapper> for BootPageMapLevel2 {
-    fn _entries(&self) -> &PageTableEntries {
+    fn entries(&self) -> &PageTableEntries {
         &self.0
     }
 
@@ -51,7 +51,7 @@ impl IntermediatePageTable<BootPageMapLevel1, IdentityMapper> for BootPageMapLev
 pub struct BootPageMapLevel3(PageTableEntries);
 
 impl PageTable<IdentityMapper> for BootPageMapLevel3 {
-    fn _entries(&self) -> &PageTableEntries {
+    fn entries(&self) -> &PageTableEntries {
         &self.0
     }
 
@@ -69,7 +69,7 @@ impl IntermediatePageTable<BootPageMapLevel2, IdentityMapper> for BootPageMapLev
 pub struct BootPageMapLevel4(PageTableEntries);
 
 impl PageTable<IdentityMapper> for BootPageMapLevel4 {
-    fn _entries(&self) -> &PageTableEntries {
+    fn entries(&self) -> &PageTableEntries {
         &self.0
     }
 
