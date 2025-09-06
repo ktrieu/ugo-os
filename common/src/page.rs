@@ -10,6 +10,7 @@ use crate::{
 };
 
 #[repr(transparent)]
+#[derive(Clone, Copy)]
 pub struct PageTableEntry {
     entry: u64,
 }

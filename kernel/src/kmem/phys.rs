@@ -2,6 +2,7 @@ use core::ptr::{slice_from_raw_parts_mut, write_bytes};
 
 use common::{
     addr::{Address, Page, PageRange, PhysAddr, PhysFrame},
+    page::PageMapAllocator,
     MemRegions, RegionType,
 };
 
@@ -170,5 +171,14 @@ impl PhysFrameAllocator {
             self.allocated,
             self.range.len()
         );
+    }
+}
+
+unsafe impl PageMapAllocator for PhysFrameAllocator {
+    fn alloc(&mut self) -> PhysFrame {
+        // TODO: the page table code should return an allocation failure to the caller
+        // instead of crashing out.
+        self.alloc_frame()
+            .expect("page table allocation should succeed")
     }
 }
