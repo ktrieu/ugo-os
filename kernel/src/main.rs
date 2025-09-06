@@ -11,7 +11,7 @@ use crate::{
         gdt::initialize_gdt,
         interrupts::{enable_interrupts, idt::initialize_idt, pic::initialize_pic},
     },
-    kmem::phys::PhysFrameAllocator,
+    kmem::{heap::KernelHeap, phys::PhysFrameAllocator},
 };
 
 #[macro_use]
@@ -43,6 +43,8 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
 
     let phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
     phys_allocator.print_stats();
+
+    let heap = KernelHeap::new(boot_info.kernel_addrs);
 
     loop {}
 }
