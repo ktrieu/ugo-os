@@ -44,18 +44,15 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     enable_interrupts();
     kprintln!("Interrupts initialized.");
 
-    let page_tables = KernelPageTables::new();
-    // Grab an entry to see if this works.
-    let addr = VirtAddr::new(PHYSMEM_START);
-    let entry = page_tables
-        .get_entry(addr)
-        .expect("this function should exist in the page tables");
-    kprintln!("{}", entry);
-
-    let phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
+    let mut page_tables = KernelPageTables::new();
+    let mut phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
     phys_allocator.print_stats();
 
-    let heap = KernelHeap::new(boot_info.kernel_addrs);
+    let heap = KernelHeap::new(
+        boot_info.kernel_addrs,
+        &mut phys_allocator,
+        &mut page_tables,
+    );
 
     loop {}
 }
