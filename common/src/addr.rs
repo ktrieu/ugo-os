@@ -380,6 +380,8 @@ impl Display for PhysFrame {
     }
 }
 
+pub type PhysFrameRange = PageRange<PhysFrame>;
+
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct VirtPage(VirtAddr);
 
@@ -400,6 +402,8 @@ impl Page for VirtPage {
         self.0
     }
 }
+
+pub type VirtPageRange = PageRange<VirtPage>;
 
 impl Display for VirtPage {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

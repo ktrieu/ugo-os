@@ -10,6 +10,7 @@ use crate::{
 };
 
 #[repr(transparent)]
+#[derive(Clone, Copy)]
 pub struct PageTableEntry {
     entry: u64,
 }
@@ -124,7 +125,7 @@ const NUM_PAGE_TABLE_ENTRIES: usize = 512;
 pub type PageTableEntries = [PageTableEntry; NUM_PAGE_TABLE_ENTRIES];
 
 pub trait PageTable<M: Mapper>: Sized {
-    fn _entries(&self) -> &PageTableEntries;
+    fn entries(&self) -> &PageTableEntries;
     fn entries_mut(&mut self) -> &mut PageTableEntries;
     fn get_entry_idx(addr: VirtAddr) -> usize;
 
@@ -132,6 +133,12 @@ pub trait PageTable<M: Mapper>: Sized {
         for e in self.entries_mut() {
             e.clear();
         }
+    }
+
+    fn get_entry(&self, addr: VirtAddr) -> &PageTableEntry {
+        self.entries()
+            .get(Self::get_entry_idx(addr))
+            .expect("Page entry index out of range!")
     }
 
     fn get_entry_mut(&mut self, addr: VirtAddr) -> &mut PageTableEntry {
@@ -159,6 +166,20 @@ pub trait PageTable<M: Mapper>: Sized {
 }
 
 pub trait IntermediatePageTable<E: PageTable<M>, M: Mapper>: PageTable<M> {
+    fn get<'a>(&'a self, addr: VirtAddr) -> Option<&'a E> {
+        // We're masking out 9 bits = 512, so this should always succeed.
+        let entry = self.get_entry(addr);
+
+        if entry.present() {
+            // Safety: The only way to insert an address into the table is via
+            // insert, which always inserts a valid address from FrameAllocator.
+            let frame = PhysFrame::from_base_addr(entry.addr());
+            unsafe { Some(E::from_frame(frame)) }
+        } else {
+            None
+        }
+    }
+
     fn get_mut<'a>(&'a mut self, addr: VirtAddr) -> Option<&'a mut E> {
         // We're masking out 9 bits = 512, so this should always succeed.
         let entry = self.get_entry_mut(addr);

@@ -4,6 +4,7 @@
 
 use core::panic::PanicInfo;
 
+use alloc::vec::Vec;
 use common::BootInfo;
 
 use crate::{
@@ -11,8 +12,10 @@ use crate::{
         gdt::initialize_gdt,
         interrupts::{enable_interrupts, idt::initialize_idt, pic::initialize_pic},
     },
-    kmem::phys::PhysFrameAllocator,
+    kmem::{heap::KernelHeap, page::KernelPageTables, phys::PhysFrameAllocator},
 };
+
+extern crate alloc;
 
 #[macro_use]
 mod kprintln;
@@ -41,8 +44,25 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     enable_interrupts();
     kprintln!("Interrupts initialized.");
 
-    let phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
+    let mut page_tables = KernelPageTables::new();
+    let mut phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
     phys_allocator.print_stats();
+
+    let heap = KernelHeap::new(
+        boot_info.kernel_addrs,
+        &mut phys_allocator,
+        &mut page_tables,
+    );
+    heap.register_global_alloc();
+
+    let mut allocated = 0;
+
+    for _ in 0..100 {
+        let n = 1024;
+        let _test = Vec::<u8>::with_capacity(n);
+        allocated += n;
+        kprintln!("allocated {allocated} bytes")
+    }
 
     loop {}
 }
