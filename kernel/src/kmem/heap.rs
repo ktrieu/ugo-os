@@ -1,6 +1,6 @@
 use core::{
-    alloc::{self, GlobalAlloc, Layout},
-    ptr::{null, null_mut},
+    alloc::{GlobalAlloc, Layout},
+    ptr::null_mut,
 };
 
 use common::{

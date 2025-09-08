@@ -5,10 +5,7 @@
 use core::panic::PanicInfo;
 
 use alloc::vec::Vec;
-use common::{
-    addr::{Address, VirtAddr},
-    BootInfo, PHYSMEM_START,
-};
+use common::BootInfo;
 
 use crate::{
     arch::{
