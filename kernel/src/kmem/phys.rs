@@ -116,12 +116,6 @@ impl PhysFrameAllocator {
 
         let (slice, used_frames) = Self::alloc_storage(range.len(), &regions);
 
-        kprintln!(
-            "Allocating space for PhysFrameAllocator: {:?} {}",
-            slice.as_ptr_range(),
-            used_frames
-        );
-
         let mut bitmap = Bitmap::new(slice);
         let mut allocated = 0;
 
