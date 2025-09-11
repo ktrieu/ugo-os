@@ -128,7 +128,6 @@ impl<'a> KernelPageTables<'a> {
 
         // Safety: This pointer comes from CR3 so it must be a valid page table.
         let table = unsafe { KernelPageMapLevel4::from_frame(PhysFrame::from_base_addr(addr)) };
-        kprintln!("Page tables loaded from {}", addr);
 
         Self {
             level_4_table: table,

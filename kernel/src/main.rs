@@ -12,7 +12,7 @@ use crate::{
         gdt::initialize_gdt,
         interrupts::{enable_interrupts, idt::initialize_idt, pic::initialize_pic},
     },
-    kmem::{heap::KernelHeap, page::KernelPageTables, phys::PhysFrameAllocator},
+    kmem::KernelMemoryManager,
 };
 
 extern crate alloc;
@@ -35,6 +35,9 @@ fn panic(info: &PanicInfo) -> ! {
 pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     kprintln::init_kprintln(&boot_info.framebuffer);
 
+    let kmm = KernelMemoryManager::new(boot_info);
+    kmm.register_global();
+
     kprintln!("Hello from UgoOS.");
     kprintln!("{}", boot_info.kernel_addrs);
 
@@ -43,17 +46,6 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     initialize_pic();
     enable_interrupts();
     kprintln!("Interrupts initialized.");
-
-    let mut page_tables = KernelPageTables::new();
-    let mut phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
-    phys_allocator.print_stats();
-
-    let heap = KernelHeap::new(
-        boot_info.kernel_addrs,
-        &mut phys_allocator,
-        &mut page_tables,
-    );
-    heap.register_global_alloc();
 
     let mut allocated = 0;
 
