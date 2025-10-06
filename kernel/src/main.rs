@@ -47,14 +47,15 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     enable_interrupts();
     kprintln!("Interrupts initialized.");
 
-    let mut allocated = 0;
+    // Comment out the allocation test code for now.
+    // let mut allocated = 0;
 
-    for _ in 0..100 {
-        let n = 1024;
-        let _test = Vec::<u8>::with_capacity(n);
-        allocated += n;
-        kprintln!("allocated {allocated} bytes")
-    }
+    // for _ in 0..100 {
+    //     let n = 1024;
+    //     let _test = Vec::<u8>::with_capacity(n);
+    //     allocated += n;
+    //     kprintln!("allocated {allocated} bytes")
+    // }
 
     loop {}
 }

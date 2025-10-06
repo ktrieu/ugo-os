@@ -1,58 +1,61 @@
-use core::{alloc::Layout, ptr::null_mut};
+use core::ptr::{self, NonNull};
 
-use common::{
-    addr::{Address, Page, VirtAddr, VirtPage, VirtPageRange},
-    KernelAddresses,
-};
+use common::addr::{is_aligned, Address, Page, VirtAddr, VirtPageRange};
 
-use crate::kmem::{
-    page::{KernelPageTables, MappingType},
-    phys::PhysFrameAllocator,
-};
+#[derive(Debug)]
+struct FreeSegment {
+    prev: Option<NonNull<FreeSegment>>,
+    next: Option<NonNull<FreeSegment>>,
+    // Size is inclusive of this header, since once we allocate from this the header will
+    // be overwritten.
+    size: u64,
+}
+
+fn vaddr_range_inclusive(start: *const FreeSegment, size: u64) -> (VirtAddr, VirtAddr) {
+    let start = start as u64;
+    let end = start + size - 1;
+    kprintln!("{} {}", VirtAddr::new(start), VirtAddr::new(end));
+
+    (VirtAddr::new(start), VirtAddr::new(end))
+}
 
 pub struct KernelHeap {
     pages: VirtPageRange,
-    top: VirtAddr,
+    free_head: Option<NonNull<FreeSegment>>,
 }
 
 impl KernelHeap {
-    const KERNEL_HEAP_PAGES: u64 = 10;
+    // Safety: the range [dst + size] must not be used or referenced.
+    unsafe fn write_free_segment(&mut self, segment: FreeSegment, dst: *mut FreeSegment) {
+        // Some sanity checks...
+        assert!(is_aligned(dst as u64, align_of::<FreeSegment>() as u64));
 
-    pub fn new(
-        addresses: KernelAddresses,
-        phys_allocator: &mut PhysFrameAllocator,
-        page_tables: &mut KernelPageTables,
-    ) -> Self {
-        let start = VirtPage::from_containing_addr(addresses.stack_top).next();
+        let (start, end) = vaddr_range_inclusive(dst, segment.size);
+        assert!(self.pages.contains_addr(start));
+        assert!(self.pages.contains_addr(end));
 
-        let heap_pages = VirtPage::range_length(start, Self::KERNEL_HEAP_PAGES);
-
-        for page in heap_pages.iter() {
-            page_tables.alloc_and_map_page(page, MappingType::DataRw, phys_allocator);
-        }
-
-        Self {
-            pages: heap_pages,
-            top: heap_pages.first().base_addr(),
-        }
+        kprintln!("Writing {:?} to {}", segment, start);
+        ptr::write(dst, segment);
     }
 
-    pub fn alloc(&mut self, layout: Layout) -> *mut u8 {
-        let aligned = self.top.align_up(layout.align() as u64);
+    // Safety: pages must refer to memory that is not being used or referenced.
+    pub unsafe fn new(pages: VirtPageRange) -> Self {
+        let mut heap = Self {
+            pages,
+            free_head: None,
+        };
 
-        let alloc_end = VirtAddr::new(aligned.as_u64() + layout.size() as u64);
+        let size = pages.len_bytes();
+        let initial_segment = FreeSegment {
+            prev: None,
+            next: None,
+            size,
+        };
 
-        if alloc_end > self.pages.end().base_addr() {
-            // Uh oh. This allocation would run past our allocated memory. Return null and bail out.
-            return null_mut();
-        }
+        let head = pages.first().base_addr().as_u8_ptr_mut() as *mut FreeSegment;
+        heap.write_free_segment(initial_segment, head);
+        heap.free_head = Some(NonNull::new(head).expect("heap initial head should be non-null"));
 
-        self.top = alloc_end;
-
-        aligned.as_u8_ptr_mut()
-    }
-
-    pub fn free(&mut self, _ptr: *mut u8, _layout: Layout) {
-        // We're just bump allocating for now. Free some memory later.
+        heap
     }
 }
