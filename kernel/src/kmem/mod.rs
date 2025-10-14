@@ -91,13 +91,12 @@ impl KernelMemoryManager {
         }
     }
 
-    pub fn heap_alloc(&mut self, _layout: Layout) -> *mut u8 {
-        // self.heap.alloc(layout)
-        return ptr::null_mut();
+    pub fn heap_alloc(&mut self, layout: Layout) -> *mut u8 {
+        self.heap.alloc(layout)
     }
 
-    pub fn heap_free(&mut self, _ptr: *mut u8, _layout: Layout) {
-        // self.heap.free(ptr, layout);
+    pub fn heap_free(&mut self, ptr: *mut u8, layout: Layout) {
+        self.heap.free(ptr, layout)
     }
 
     pub fn register_global(self) {
