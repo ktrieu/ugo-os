@@ -192,6 +192,11 @@ impl<'a> Mappings<'a> {
     pub fn map_physical_memory(&mut self, memory_map: &MemoryMap, allocator: &mut FrameAllocator) {
         let highest_segment = memory_map
             .entries()
+            // On my laptop, the UEFI memory map includes a really high physical segment at 0xFD00000000.
+            // The loader maps from 0 -> highest known memory segment, so we map all memory from
+            // 0x0 -> 0xFD00000000 which takes a thousand years.
+            // We should be smarter and only map ranges mentioned in the memory map - but for now just hack around this.
+            .filter(|d| d.phys_start != 0xFD00000000)
             .max_by_key(|descriptor| descriptor.phys_start)
             .expect("Memory map was empty!");
 
