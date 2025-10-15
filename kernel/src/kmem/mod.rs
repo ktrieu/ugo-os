@@ -11,17 +11,16 @@ use conquer_once::spin::OnceCell;
 
 use crate::{
     kmem::{
-        heap::KernelHeap,
+        ll_heap::KernelHeap,
         page::{KernelPageTables, MappingType},
         phys::PhysFrameAllocator,
     },
     sync::InterruptSafeSpinlock,
 };
 
-pub mod heap;
+pub mod ll_heap;
 pub mod page;
 pub mod phys;
-
 pub struct GlobalMemoryManager(OnceCell<InterruptSafeSpinlock<KernelMemoryManager>>);
 
 #[global_allocator]
