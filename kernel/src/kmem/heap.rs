@@ -7,9 +7,9 @@ use core::{
 use common::addr::{align_up, is_aligned, Address, Page, VirtAddr, VirtPageRange};
 
 #[derive(Debug)]
-struct FreeSegment {
-    prev: Option<NonNull<FreeSegment>>,
-    next: Option<NonNull<FreeSegment>>,
+struct FreeHeader {
+    prev: Option<NonNull<FreeHeader>>,
+    next: Option<NonNull<FreeHeader>>,
     // Size is inclusive of this header, since once we allocate from this the header will
     // be overwritten.
     size: usize,
@@ -26,25 +26,31 @@ struct AllocationHeader {
 const ALLOC_HEADER_ALIGN: usize = align_of::<AllocationHeader>();
 const ALLOC_HEADER_SIZE: usize = size_of::<AllocationHeader>();
 
-const FREE_HEADER_ALIGN: usize = align_of::<FreeSegment>();
-const FREE_HEADER_SIZE: usize = align_of::<FreeSegment>();
+const FREE_HEADER_ALIGN: usize = align_of::<FreeHeader>();
+const FREE_HEADER_SIZE: usize = align_of::<FreeHeader>();
 
-fn offset_range_exclusive(start: *const FreeSegment, size: usize) -> (usize, usize) {
-    let start = start as usize;
-
-    (start, start + size)
+struct FreeHandle<'heap> {
+    data: &'heap mut FreeHeader,
+    offset: usize,
 }
 
-fn vaddr_range_inclusive(start: *const FreeSegment, size: usize) -> (VirtAddr, VirtAddr) {
-    let start = start as usize;
-    let end = start + size - 1;
+impl<'heap> FreeHandle<'heap> {
+    fn range_exclusive(&self) -> (usize, usize) {
+        (self.offset, self.offset + self.data.size)
+    }
 
-    (VirtAddr::new(start as u64), VirtAddr::new(end as u64))
+    fn range_inclusive(&self) -> (usize, usize) {
+        (self.offset, self.offset + self.data.size - 1)
+    }
+
+    fn as_ptr_mut(&mut self) -> *mut FreeHeader {
+        self.data
+    }
 }
 
 pub struct KernelHeap {
     pages: VirtPageRange,
-    free_head: Option<NonNull<FreeSegment>>,
+    free_head: Option<NonNull<FreeHeader>>,
 }
 
 #[derive(Debug)]
@@ -60,30 +66,39 @@ struct AllocResult {
 }
 
 impl KernelHeap {
+    // Safety: ptr must point to a valid instance of FreeSegment inside our heap
+    // memory area.
+    unsafe fn get_free_segment_mut(&mut self, ptr: *mut FreeHeader) -> FreeHandle {
+        let offset = ptr as usize;
+
+        assert!((offset as u64) >= self.pages.first().base_u64());
+        assert!((offset as u64) < self.pages.end().base_u64());
+
+        let data = &mut (*ptr);
+        FreeHandle { data, offset }
+    }
+
     // Safety: the range [dst, dst + size] must not be used or referenced.
-    unsafe fn write_free_segment(&mut self, segment: FreeSegment, dst: *mut FreeSegment) {
+    // offset must be properly aligned for FreeHeader.
+    unsafe fn write_free_segment(&mut self, segment: FreeHeader, offset: usize) -> FreeHandle {
         // Some sanity checks...
-        assert!(is_aligned(dst as u64, align_of::<FreeSegment>() as u64));
+        assert!(is_aligned(offset as u64, align_of::<FreeHeader>() as u64));
+        assert!(offset as u64 >= self.pages.first().base_u64());
+        assert!((offset + segment.size) as u64 <= self.pages.end().base_u64());
 
-        let (start, end) = vaddr_range_inclusive(dst, segment.size);
-        assert!(self.pages.contains_addr(start));
-        assert!(self.pages.contains_addr(end));
-
-        kprintln!("Writing {:?} to {:?}", segment, dst);
+        let dst = offset as *mut FreeHeader;
 
         ptr::write(dst, segment);
+
+        FreeHandle {
+            data: &mut *dst,
+            offset,
+        }
     }
 
     // Safety: segment must point to a valid FreeSegment inside this heap.
-    unsafe fn try_alloc_segment(
-        segment: *const FreeSegment,
-        size: usize,
-        align: u64,
-    ) -> Option<AllocResult> {
-        // Hack - fix by creating a handle type for free segments from the heap.
-        // This is safe because we asserted that the above pointer is valid.
-        let free_size = unsafe { (*segment).size };
-        let (free_start, free_end) = offset_range_exclusive(segment, free_size);
+    fn try_alloc_segment(handle: FreeHandle, size: usize, align: u64) -> Option<AllocResult> {
+        let (free_start, free_end) = handle.range_exclusive();
 
         // Our usable memory starts after allocating space for our allocation header.
         // Align up to ensure we have a start address that's compatible with the requested alignment.
@@ -129,18 +144,20 @@ impl KernelHeap {
         };
 
         let size = pages.len_bytes() as usize;
-        let initial_segment = FreeSegment {
+        let initial_segment = FreeHeader {
             prev: None,
             next: None,
             size,
         };
 
-        let head = pages.first().base_addr().as_u8_ptr_mut() as *mut FreeSegment;
-        heap.write_free_segment(initial_segment, head);
-        heap.free_head = Some(NonNull::new(head).expect("heap initial head should be non-null"));
+        let start_offset = pages.first().base_u64() as usize;
+        let mut handle = heap.write_free_segment(initial_segment, start_offset);
+        heap.free_head =
+            Some(NonNull::new(handle.as_ptr_mut()).expect("heap initial head should be non-null"));
 
         // try to allocate something?
-        let result = Self::try_alloc_segment(heap.free_head.unwrap().as_ptr(), 16, 16);
+        let head = heap.get_free_segment_mut(heap.free_head.unwrap().as_mut());
+        let result = Self::try_alloc_segment(head, 16, 16);
         kprintln!("{:?}", result);
 
         heap
