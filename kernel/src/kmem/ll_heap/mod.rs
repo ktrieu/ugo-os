@@ -6,6 +6,8 @@ use core::{
 
 use common::addr::{align_up, is_aligned, Address, Page, VirtAddr, VirtPageRange};
 
+pub mod freelist;
+
 #[derive(Debug)]
 struct FreeHeader {
     prev: Option<NonNull<FreeHeader>>,
