@@ -1,6 +1,6 @@
 use core::fmt::{Debug, Formatter, Result};
 use core::num::NonZero;
-use core::ops::{Add, Sub};
+use core::ops::Sub;
 use core::ptr;
 
 use common::addr::{Address, Page, VirtPageRange};

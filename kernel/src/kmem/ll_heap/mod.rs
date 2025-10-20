@@ -1,13 +1,9 @@
-use core::{
-    alloc::Layout,
-    cmp::max,
-    ptr::{self, null, null_mut, NonNull},
-};
+use core::alloc::Layout;
 
-use common::addr::{align_down, align_up, is_aligned, Address, Page, VirtAddr, VirtPageRange};
+use common::addr::{align_up, is_aligned, VirtPageRange};
 
 use crate::kmem::ll_heap::freelist::{
-    AllocBlock, FreeBlock, FreeList, HeapOffset, FREELIST_ENTRY_ALIGN, FREELIST_ENTRY_SIZE,
+    FreeBlock, FreeList, HeapOffset, FREELIST_ENTRY_ALIGN, FREELIST_ENTRY_SIZE,
 };
 
 pub mod freelist;
