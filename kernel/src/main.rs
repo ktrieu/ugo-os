@@ -47,7 +47,6 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
     enable_interrupts();
     kprintln!("Interrupts initialized.");
 
-    // Comment out the allocation test code for now.
     let mut allocated = 0;
 
     for _ in 0..100 {
