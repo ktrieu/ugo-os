@@ -1,20 +1,26 @@
 use core::{
     alloc::{GlobalAlloc, Layout},
-    ptr::null_mut,
+    ptr::{self, null_mut},
 };
 
-use common::BootInfo;
+use common::{
+    addr::{Page, VirtPage, VirtPageRange},
+    BootInfo, KernelAddresses,
+};
 use conquer_once::spin::OnceCell;
 
 use crate::{
-    kmem::{heap::KernelHeap, page::KernelPageTables, phys::PhysFrameAllocator},
+    kmem::{
+        ll_heap::KernelHeap,
+        page::{KernelPageTables, MappingType},
+        phys::PhysFrameAllocator,
+    },
     sync::InterruptSafeSpinlock,
 };
 
-pub mod heap;
+pub mod ll_heap;
 pub mod page;
 pub mod phys;
-
 pub struct GlobalMemoryManager(OnceCell<InterruptSafeSpinlock<KernelMemoryManager>>);
 
 #[global_allocator]
@@ -45,15 +51,37 @@ pub struct KernelMemoryManager {
 }
 
 impl KernelMemoryManager {
+    const KERNEL_HEAP_PAGES: u64 = 10;
+
+    fn bootstrap_heap_area(
+        addresses: &KernelAddresses,
+        allocator: &mut PhysFrameAllocator,
+        page_tables: &mut KernelPageTables,
+    ) -> VirtPageRange {
+        let start = VirtPage::from_containing_addr(addresses.stack_top).next();
+
+        let heap_pages = VirtPage::range_length(start, Self::KERNEL_HEAP_PAGES);
+
+        for page in heap_pages.iter() {
+            page_tables.alloc_and_map_page(page, MappingType::DataRw, allocator);
+        }
+
+        heap_pages
+    }
+
     pub fn new(boot_info: &'static BootInfo) -> Self {
         let mut page_tables = KernelPageTables::new();
         let mut phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
 
-        let heap = KernelHeap::new(
-            boot_info.kernel_addrs,
+        let heap_page_range = Self::bootstrap_heap_area(
+            &boot_info.kernel_addrs,
             &mut phys_allocator,
             &mut page_tables,
         );
+
+        // Safety: bootstrap_heap_area returns unused memory from beyond the kernel stack and
+        // maps it in as RW.
+        let heap = unsafe { KernelHeap::new(heap_page_range) };
 
         Self {
             _phys_allocator: phys_allocator,
@@ -67,7 +95,7 @@ impl KernelMemoryManager {
     }
 
     pub fn heap_free(&mut self, ptr: *mut u8, layout: Layout) {
-        self.heap.free(ptr, layout);
+        self.heap.free(ptr, layout)
     }
 
     pub fn register_global(self) {

@@ -275,6 +275,11 @@ impl<P: Page> PageRange<P> {
         page.base_u64() >= self.start.base_u64() && page.base_u64() < self.end.base_u64()
     }
 
+    pub fn contains_addr(&self, addr: P::A) -> bool {
+        let p = P::from_containing_addr(addr);
+        self.contains(p)
+    }
+
     pub fn contains_range(&self, other: PageRange<P>) -> bool {
         self.first().base_u64() <= other.first().base_u64()
             && self.last().base_u64() >= other.last().base_u64()
