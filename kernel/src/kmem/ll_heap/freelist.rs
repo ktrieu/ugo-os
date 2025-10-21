@@ -216,15 +216,46 @@ impl FreeList {
     }
 
     pub fn head(&self) -> Option<FreeBlock> {
-        unsafe {
-            self.head.map(|o| {
-                let entry = self.entry_from_offset(o);
+        // Head is always valid.
+        self.head.map(|o| unsafe {
+            let entry = self.entry_from_offset(o);
 
-                FreeBlock {
-                    start: o,
-                    end: self.offset(usize::from(o) + entry.size),
-                }
-            })
+            FreeBlock {
+                start: o,
+                end: self.offset(usize::from(o) + entry.size),
+            }
+        })
+    }
+
+    pub fn iter<'list>(&'list self) -> FreeListIter<'list> {
+        FreeListIter {
+            free_list: self,
+            current: self.head,
         }
+    }
+}
+
+pub struct FreeListIter<'list> {
+    free_list: &'list FreeList,
+    current: Option<HeapOffset>,
+}
+
+impl<'list> Iterator for FreeListIter<'list> {
+    type Item = FreeBlock;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Invariant: current is always valid.
+        self.current.map(|o| unsafe {
+            let entry = self.free_list.entry_from_offset(o);
+
+            let block = FreeBlock {
+                start: o,
+                end: self.free_list.offset(usize::from(o) + entry.size),
+            };
+
+            self.current = entry.next;
+
+            block
+        })
     }
 }

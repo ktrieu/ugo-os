@@ -111,7 +111,7 @@ impl KernelHeap {
 
     pub fn alloc(&mut self, layout: Layout) -> *mut u8 {
         // For now, just grab from the head.
-        let head = self.free_list.head().expect("head should be present");
+        let head = self.free_list.iter().next().expect("head must exist");
 
         let details = self
             .try_alloc_from_free_block(&head, layout.size(), layout.align())
@@ -135,6 +135,11 @@ impl KernelHeap {
             ALLOC_HEADER_ALIGN
         ));
         assert!(usize::from(details.header_start) + ALLOC_HEADER_SIZE < usize::from(header.end));
+        // The header should be right before the pointer we return, or we'll never be able to recover it in `free`.
+        assert!(
+            usize::from(details.header_start) + ALLOC_HEADER_SIZE
+                == usize::from(details.alloc_start)
+        );
 
         // AllocHeader represents memory
         // that came from a free block, so it's free for writing.
