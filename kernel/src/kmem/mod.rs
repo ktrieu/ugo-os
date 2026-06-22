@@ -5,6 +5,7 @@ use core::{
 
 use common::{
     addr::{Page, VirtPage, VirtPageRange},
+    slab::SlabAllocator,
     BootInfo, KernelAddresses,
 };
 use conquer_once::spin::OnceCell;
@@ -47,11 +48,12 @@ unsafe impl GlobalAlloc for GlobalMemoryManager {
 pub struct KernelMemoryManager {
     _phys_allocator: PhysFrameAllocator,
     _page_tables: KernelPageTables<'static>,
-    heap: KernelHeap,
+    bootstrap_slab: SlabAllocator,
 }
 
 impl KernelMemoryManager {
-    const KERNEL_HEAP_PAGES: u64 = 10;
+    const KERNEL_BOOTSTRAP_PAGES: u64 = 2;
+    const KERNEL_BOOTSTRAP_SLAB_SIZE: u32 = 32;
 
     fn bootstrap_heap_area(
         addresses: &KernelAddresses,
@@ -60,7 +62,7 @@ impl KernelMemoryManager {
     ) -> VirtPageRange {
         let start = VirtPage::from_containing_addr(addresses.stack_top).next();
 
-        let heap_pages = VirtPage::range_length(start, Self::KERNEL_HEAP_PAGES);
+        let heap_pages = VirtPage::range_length(start, Self::KERNEL_BOOTSTRAP_PAGES);
 
         for page in heap_pages.iter() {
             page_tables.alloc_and_map_page(page, MappingType::DataRw, allocator);
@@ -73,7 +75,7 @@ impl KernelMemoryManager {
         let mut page_tables = KernelPageTables::new();
         let mut phys_allocator = PhysFrameAllocator::new(boot_info.mem_regions);
 
-        let heap_page_range = Self::bootstrap_heap_area(
+        let bootstrap_pages = Self::bootstrap_heap_area(
             &boot_info.kernel_addrs,
             &mut phys_allocator,
             &mut page_tables,
@@ -81,21 +83,26 @@ impl KernelMemoryManager {
 
         // Safety: bootstrap_heap_area returns unused memory from beyond the kernel stack and
         // maps it in as RW.
-        let heap = unsafe { KernelHeap::new(heap_page_range) };
+        let bootstrap_slab =
+            unsafe { SlabAllocator::new(bootstrap_pages, Self::KERNEL_BOOTSTRAP_SLAB_SIZE) };
 
         Self {
             _phys_allocator: phys_allocator,
             _page_tables: page_tables,
-            heap,
+            bootstrap_slab,
         }
     }
 
     pub fn heap_alloc(&mut self, layout: Layout) -> *mut u8 {
-        self.heap.alloc(layout)
+        // For now we only we support 32 bytes or less.
+        assert!(layout.size() < Self::KERNEL_BOOTSTRAP_SLAB_SIZE as usize);
+        assert!(layout.align() < Self::KERNEL_BOOTSTRAP_SLAB_SIZE as usize);
+        self.bootstrap_slab.alloc().unwrap()
     }
 
     pub fn heap_free(&mut self, ptr: *mut u8, layout: Layout) {
-        self.heap.free(ptr, layout)
+        assert!(self.bootstrap_slab.owns_ptr(ptr));
+        self.bootstrap_slab.free(ptr);
     }
 
     pub fn register_global(self) {

@@ -4,7 +4,7 @@
 
 use core::panic::PanicInfo;
 
-use alloc::vec::Vec;
+use alloc::boxed::Box;
 use common::BootInfo;
 
 use crate::{
@@ -49,14 +49,19 @@ pub extern "C" fn _start(boot_info: &'static mut BootInfo) -> ! {
 
     let mut allocated = 0;
 
-    for _ in 0..100 {
-        let n = 1024;
-        let mut test = Vec::<u8>::with_capacity(n);
-        for _ in 0..n {
-            test.push(b'a');
-        }
-        allocated += n;
+    let mut boxes: [Option<Box<[u8; 16]>>; 100] = [const { None }; 100];
+
+    for i in 0..100 {
+        boxes[i] = Some(Box::new([0; 16]));
+        allocated += 16;
         kprintln!("allocated {allocated} bytes")
+    }
+
+    let mut freed = 0;
+    for i in 0..100 {
+        boxes[i] = None;
+        freed += 16;
+        kprintln!("freed {freed} bytes")
     }
 
     loop {}
