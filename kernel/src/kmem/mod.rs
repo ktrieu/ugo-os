@@ -1,6 +1,6 @@
 use core::{
     alloc::{GlobalAlloc, Layout},
-    ptr::{self, null_mut},
+    ptr::null_mut,
 };
 
 use common::{
@@ -12,14 +12,12 @@ use conquer_once::spin::OnceCell;
 
 use crate::{
     kmem::{
-        ll_heap::KernelHeap,
         page::{KernelPageTables, MappingType},
         phys::PhysFrameAllocator,
     },
     sync::InterruptSafeSpinlock,
 };
 
-pub mod ll_heap;
 pub mod page;
 pub mod phys;
 pub struct GlobalMemoryManager(OnceCell<InterruptSafeSpinlock<KernelMemoryManager>>);
@@ -100,7 +98,7 @@ impl KernelMemoryManager {
         self.bootstrap_slab.alloc().unwrap()
     }
 
-    pub fn heap_free(&mut self, ptr: *mut u8, layout: Layout) {
+    pub fn heap_free(&mut self, ptr: *mut u8, _: Layout) {
         assert!(self.bootstrap_slab.owns_ptr(ptr));
         self.bootstrap_slab.free(ptr);
     }
