@@ -1,6 +1,6 @@
-use crate::{
-    addr::{Page, VirtPage, VirtPageRange},
+use common::{
     KMEM_START,
+    addr::{Page, VirtPage, VirtPageRange},
 };
 
 extern crate alloc;
