@@ -5,13 +5,15 @@ use crate::{
 
 extern crate alloc;
 
-use alloc::boxed::Box;
+use alloc::sync::Arc;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum VTreeAreaType {
     KernelCode,
     Framebuffer,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VTreeArea {
     range: VirtPageRange,
     ty: VTreeAreaType,
@@ -21,37 +23,69 @@ pub struct VTreeArea {
 pub struct VTreeNode {
     area: VTreeArea,
 
+    // Gap between the left of this and the next node (or the start of the KMEM area)
     gap: u64,
+    // Max of all values of gap below this node.
     max_gap: u64,
 
     balance: u8,
-    left: Option<Box<VTreeNode>>,
-    right: Option<Box<VTreeNode>>,
+    left: Option<Arc<VTreeNode>>,
+    right: Option<Arc<VTreeNode>>,
 }
 
 pub struct VTree {
-    head: Option<Box<VTreeNode>>,
+    head: Option<Arc<VTreeNode>>,
     range: VirtPageRange,
 }
 
 impl VTree {
-    pub fn new(areas: &[(u64, VTreeArea)]) -> Self {
-        // This tree captures the entirety of virtual kernel space.
-        let start = KMEM_START;
-
-        let mut prev_addr = start;
-        for (_gap, a) in areas {
-            let node = V
-        }
-
-        Self {
-            head: None,
-            range: VirtPageRange::new(
-                VirtPage::from_base_u64(start),
-                VirtPage::from_base_u64(prev_addr),
-            ),
-        }
+    fn insert_at_rec(
+        &mut self,
+        area: &VTreeArea,
+        node: Arc<VTreeNode>,
+    ) -> (Arc<VTreeNode>, VirtPageRange) {
+        // nothing ever happens
+        (node, area.range)
     }
 
+    pub fn insert(&mut self, area: &VTreeArea) {
+        let range_start = self.range.first().base_u64();
 
+        let (head, range) = match &self.head {
+            Some(head) => self.insert_at_rec(area, head.clone()),
+            None => {
+                let gap = area.range.first().base_u64() - range_start;
+                let node = VTreeNode {
+                    area: *area,
+                    gap,
+                    max_gap: gap,
+                    balance: 0,
+                    left: None,
+                    right: None,
+                };
+                let range = VirtPage::range_exclusive(self.range.first(), area.range.end());
+                (Arc::new(node), range)
+            }
+        };
+
+        self.head = Some(head);
+        self.range = range;
+    }
+
+    pub fn new(areas: &[VTreeArea]) -> Self {
+        // This tree captures the entirety of virtual kernel space.
+        let start = VirtPage::from_base_u64(KMEM_START);
+        let end = start;
+
+        let mut tree = Self {
+            head: None,
+            range: VirtPage::range_exclusive(start, end),
+        };
+
+        for a in areas {
+            tree.insert(a);
+        }
+
+        tree
+    }
 }
