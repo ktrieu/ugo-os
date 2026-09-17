@@ -20,3 +20,4 @@ bilge = "0.1.3"
 
 [build-dependencies]
 common = { path = "../common" }
+ksupport = { path = "../ksupport" }

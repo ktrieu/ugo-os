@@ -2,6 +2,7 @@
 bootloader/target/
 kernel/target/
 common/target/
+ksupport/target/
 
 # OVMF files, you're going to have to get these yourself
 ovmf/
