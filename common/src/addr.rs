@@ -84,7 +84,7 @@ impl Display for PhysAddr {
     }
 }
 
-#[derive(PartialEq, PartialOrd, Clone, Copy, Eq, Ord)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy, Eq, Ord)]
 pub struct VirtAddr(u64);
 
 impl VirtAddr {
@@ -234,7 +234,7 @@ where
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PageRange<P: Page + Copy> {
     // Inclusive lower bound.
     start: P,
@@ -387,7 +387,7 @@ impl Display for PhysFrame {
 
 pub type PhysFrameRange = PageRange<PhysFrame>;
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct VirtPage(VirtAddr);
 
 impl Page for VirtPage {
