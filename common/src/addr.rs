@@ -1,4 +1,4 @@
-use core::fmt::Display;
+use core::{cmp::Ordering, fmt::Display};
 
 use crate::{PAGE_SIZE, PHYSADDR_SIZE, PHYSMEM_START, VIRTADDR_SIZE};
 
@@ -234,7 +234,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PageRange<P: Page + Copy> {
     // Inclusive lower bound.
     start: P,
@@ -325,6 +325,20 @@ impl<P: Page> PageRange<P> {
 impl<P: Page + Display> Display for PageRange<P> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{} - {} (length {})", self.start, self.end, self.len())
+    }
+}
+
+impl<P: Page + PartialOrd> PartialOrd for PageRange<P> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.end <= other.start {
+            Some(Ordering::Less)
+        } else if self.start >= other.end {
+            Some(Ordering::Greater)
+        } else if self == other {
+            Some(Ordering::Equal)
+        } else {
+            None
+        }
     }
 }
 
