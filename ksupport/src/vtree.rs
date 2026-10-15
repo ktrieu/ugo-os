@@ -1,7 +1,7 @@
 use core::cmp::Ordering;
 
 use common::{
-    KMEM_START,
+    KMEM_START, PAGE_SIZE,
     addr::{Page, VirtPage, VirtPageRange},
 };
 
@@ -24,7 +24,7 @@ pub struct VTreeArea {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VTreeData {
     area: VTreeArea,
-    // Gap between the left of this and the next node (or the start of the KMEM area)
+    // Gap between the left of this and the next node (or the start of the tree's area)
     gap: u64,
     // Max of all values of gap below this node.
     max_gap: u64,
@@ -46,7 +46,7 @@ pub struct VTree {
 }
 
 impl VTree {
-    fn insert_at_rec(area: &VTreeArea, node: &mut VTreeNode) -> Option<VTreeData> {
+    fn insert_at_rec(area: &VTreeArea, node: &mut VTreeNode, gap: u64) -> Option<VTreeData> {
         let branch = match area
             .range
             .partial_cmp(&node.data.area.range)
@@ -62,15 +62,14 @@ impl VTree {
 
         let inserted = match branch.as_mut() {
             Some(child) => {
-                let result = Self::insert_at_rec(area, child);
+                let result = Self::insert_at_rec(area, child, gap);
                 result
             }
             None => {
                 let data = VTreeData {
                     area: *area,
-                    // TODO: actually calculate this without it being aggravating.
-                    gap: 0,
-                    max_gap: 0,
+                    gap,
+                    max_gap: gap,
                     height: 1,
                 };
                 *branch = Some(Box::new(VTreeNode {
@@ -95,19 +94,18 @@ impl VTree {
         inserted
     }
 
-    pub fn insert(&mut self, area: &VTreeArea) {
+    pub fn insert(&mut self, area: &VTreeArea, gap: u64) {
         match &mut self.head {
             Some(head) => {
-                Self::insert_at_rec(area, head);
+                Self::insert_at_rec(area, head, gap);
             }
             None => {
-                let gap = VirtPage::range_exclusive(self.range.first(), area.range.first()).len();
                 let node = VTreeNode {
                     data: VTreeData {
                         area: *area,
                         gap,
                         max_gap: gap,
-                        height: 0,
+                        height: 1,
                     },
                     left: None,
                     right: None,
@@ -122,16 +120,21 @@ impl VTree {
 
     pub fn new(areas: &[VTreeArea]) -> Self {
         // This tree captures the entirety of virtual kernel space.
-        let start = VirtPage::from_base_u64(KMEM_START);
-        let end = start;
+        let kmem_start = VirtPage::from_base_u64(KMEM_START);
+        let end = kmem_start;
 
         let mut tree = Self {
             head: None,
-            range: VirtPage::range_exclusive(start, end),
+            range: VirtPage::range_exclusive(kmem_start, end),
         };
 
+        let mut prev_end = kmem_start;
         for a in areas {
-            tree.insert(a);
+            let gap = (a.range.first().base_u64() - prev_end.base_u64()) / PAGE_SIZE;
+
+            tree.insert(a, gap);
+
+            prev_end = a.range.end();
         }
 
         tree
@@ -175,32 +178,6 @@ mod test {
         vec
     }
 
-    #[test]
-    fn test_insert_one() {
-        let start = VirtPage::from_base_u64(KMEM_START + (3 * 4096));
-        let range = VirtPage::range_length(start, 4);
-
-        let one_area = VTreeArea {
-            range,
-            ty: VTreeAreaType::KernelCode,
-        };
-
-        let areas = [one_area];
-
-        let tree = VTree::new(&areas);
-
-        let nodes = to_vec(&tree);
-        assert_eq!(
-            nodes,
-            vec![VTreeData {
-                area: one_area,
-                gap: 3,
-                max_gap: 3,
-                height: 0,
-            }]
-        )
-    }
-
     fn verify_height_rec(node: &VTreeNode) -> u8 {
         let left_height = node
             .left
@@ -226,30 +203,70 @@ mod test {
         }
     }
 
+    fn verify_gaps(tree: &VTree) {
+        let datas = to_vec(tree);
+
+        let mut prev = tree.range.first();
+
+        for d in datas {
+            let gap = (d.area.range.first().base_u64() - prev.base_u64()) / PAGE_SIZE;
+            assert_eq!(gap, d.gap);
+            prev = d.area.range.end();
+        }
+    }
+
     #[test]
-    fn test_multiple_insert() {
+    fn test_init_one() {
+        let start = VirtPage::from_base_u64(KMEM_START + (3 * 4096));
+        let range = VirtPage::range_length(start, 4);
+
+        let one_area = VTreeArea {
+            range,
+            ty: VTreeAreaType::KernelCode,
+        };
+
+        let areas = [one_area];
+
+        let tree = VTree::new(&areas);
+
+        let nodes = to_vec(&tree);
+        assert_eq!(
+            nodes,
+            vec![VTreeData {
+                area: one_area,
+                gap: 3,
+                max_gap: 3,
+                height: 1,
+            }]
+        );
+
+        verify_gaps(&tree);
+        verify_heights(&tree);
+    }
+
+    #[test]
+    fn test_multiple_init() {
         // Generate some ranges
-        let mut start = VirtPage::from_base_u64(KMEM_START);
-        let mut ranges = Vec::new();
+        let mut start = VirtPage::from_base_u64(KMEM_START + (PAGE_SIZE * 2));
+        let mut init_areas = Vec::new();
         for i in 0..5 {
             let range = VirtPage::range_length(start, 2);
-            ranges.push(range);
+            let area = VTreeArea {
+                range,
+                ty: KernelCode,
+            };
+            init_areas.push(area);
             start = range.end();
         }
 
-        let mut tree = VTree::new(&[]);
+        let mut tree = VTree::new(&init_areas);
 
-        for r in &ranges {
-            tree.insert(&VTreeArea {
-                range: *r,
-                ty: KernelCode,
-            });
-        }
+        let v: Vec<VTreeData> = to_vec(&tree);
 
-        let v: Vec<VirtPageRange> = to_vec(&tree).iter().map(|n| n.area.range).collect();
+        let areas: Vec<VTreeArea> = v.iter().map(|d| d.area).collect();
+        assert_eq!(init_areas, areas);
 
-        assert_eq!(v, ranges);
-
+        verify_gaps(&tree);
         verify_heights(&tree);
     }
 }
