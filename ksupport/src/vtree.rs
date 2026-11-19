@@ -1,4 +1,4 @@
-use core::cmp::Ordering;
+use core::{cmp::Ordering, mem::swap};
 
 use common::{
     KMEM_START, PAGE_SIZE,
@@ -48,6 +48,19 @@ impl VTreeNode {
 
         VirtPage::range_length(start, self.data.gap)
     }
+
+    fn heights(&self) -> (u8, u8) {
+        (
+            self.left.as_ref().map(|n| n.data.height).unwrap_or(0),
+            self.right.as_ref().map(|n| n.data.height).unwrap_or(0),
+        )
+    }
+
+    fn balance(&self) -> i8 {
+        let (left, right) = self.heights();
+
+        right as i8 - left as i8
+    }
 }
 
 pub struct VTree {
@@ -56,6 +69,56 @@ pub struct VTree {
 }
 
 impl VTree {
+    fn rotate_left(node: &mut VTreeNode) {
+        let mut right = node
+            .right
+            .take()
+            .expect("unbalanced node should have right child");
+
+        swap(node, &mut right);
+
+        let left_child = node.left.take();
+        right.right = left_child;
+        node.left = Some(right);
+    }
+
+    fn rotate_right(node: &mut VTreeNode) {
+        let mut left = node
+            .left
+            .take()
+            .expect("unbalanced node should have left child");
+
+        swap(node, &mut left);
+
+        let right_child = node.left.take();
+        left.left = right_child;
+        node.right = Some(left);
+    }
+
+    fn rebalance(node: &mut VTreeNode, balance: i8) {
+        if balance > 0 {
+            let right = node
+                .right
+                .as_mut()
+                .expect("unbalanced node should have right child");
+            if right.balance() < 0 {
+                Self::rotate_right(right);
+            }
+
+            Self::rotate_left(node);
+        } else {
+            let left = node
+                .left
+                .as_mut()
+                .expect("unbalanced node should have left child");
+            if left.balance() > 0 {
+                Self::rotate_left(left);
+            }
+
+            Self::rotate_right(node);
+        }
+    }
+
     fn insert_at_rec(area: &VTreeArea, node: &mut VTreeNode, gap: u64) -> Option<VTreeData> {
         let branch = match area
             .range
@@ -94,13 +157,16 @@ impl VTree {
 
         // Be sure to update this node, if needed before return
         if inserted.is_some() {
-            let left_height = node.left.as_ref().map(|n| n.data.height).unwrap_or(0);
-            let right_height = node.right.as_ref().map(|n| n.data.height).unwrap_or(0);
-            node.data.height = left_height.max(right_height) + 1;
-
             let left_max_gap = node.left.as_ref().map(|n| n.data.max_gap).unwrap_or(0);
             let right_max_gap = node.right.as_ref().map(|n| n.data.max_gap).unwrap_or(0);
             node.data.max_gap = left_max_gap.max(right_max_gap).max(node.data.gap);
+
+            let (left, right) = node.heights();
+            node.data.height = left.max(right) + 1;
+
+            if node.balance().abs() >= 2 {
+                Self::rebalance(node, node.balance());
+            }
         }
 
         inserted
