@@ -93,12 +93,14 @@ impl VTree {
         };
 
         // Be sure to update this node, if needed before return
-        if let Some(data) = inserted {
+        if inserted.is_some() {
             let left_height = node.left.as_ref().map(|n| n.data.height).unwrap_or(0);
             let right_height = node.right.as_ref().map(|n| n.data.height).unwrap_or(0);
             node.data.height = left_height.max(right_height) + 1;
 
-            node.data.max_gap = node.data.max_gap.max(data.gap);
+            let left_max_gap = node.left.as_ref().map(|n| n.data.max_gap).unwrap_or(0);
+            let right_max_gap = node.right.as_ref().map(|n| n.data.max_gap).unwrap_or(0);
+            node.data.max_gap = left_max_gap.max(right_max_gap).max(node.data.gap);
         }
 
         inserted
@@ -264,6 +266,28 @@ mod test {
         }
     }
 
+    fn verify_max_gap_rec(node: &VTreeNode) {
+        let left_max = node.left.as_ref().map(|n| n.data.max_gap).unwrap_or(0);
+        let right_max = node.right.as_ref().map(|n| n.data.max_gap).unwrap_or(0);
+
+        let computed_max = left_max.max(right_max).max(node.data.gap);
+
+        assert_eq!(computed_max, node.data.max_gap);
+        assert!(node.data.gap <= computed_max);
+    }
+
+    fn verify_max_gaps(tree: &VTree) {
+        if let Some(node) = &tree.head {
+            verify_max_gap_rec(&node)
+        }
+    }
+
+    fn verify(tree: &VTree) {
+        verify_gaps(tree);
+        verify_heights(tree);
+        verify_max_gaps(tree);
+    }
+
     #[test]
     fn test_init_one() {
         let start = VirtPage::from_base_u64(KMEM_START + (3 * 4096));
@@ -289,8 +313,7 @@ mod test {
             }]
         );
 
-        verify_gaps(&tree);
-        verify_heights(&tree);
+        verify(&tree)
     }
 
     #[test]
@@ -315,8 +338,7 @@ mod test {
         let areas: Vec<VTreeArea> = v.iter().map(|d| d.area).collect();
         assert_eq!(init_areas, areas);
 
-        verify_gaps(&tree);
-        verify_heights(&tree);
+        verify(&tree)
     }
 
     #[test]
@@ -333,10 +355,8 @@ mod test {
         tree.alloc_range(1, VTreeAreaType::KernelCode);
 
         let areas = to_vec(&tree);
-        dbg!(&areas);
 
-        verify_gaps(&tree);
-        verify_heights(&tree);
+        verify(&tree);
 
         assert_eq!(areas[0].area.range.len(), 1);
     }
