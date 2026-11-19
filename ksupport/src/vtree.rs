@@ -10,7 +10,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum VTreeAreaType {
+pub enum VTreeAreaType {
     KernelCode,
     Framebuffer,
 }
@@ -38,6 +38,16 @@ pub struct VTreeNode {
     data: VTreeData,
     left: Option<Box<VTreeNode>>,
     right: Option<Box<VTreeNode>>,
+}
+
+impl VTreeNode {
+    fn gap_range(&self) -> VirtPageRange {
+        let start = VirtPage::from_base_u64(
+            self.data.area.range.first().base_u64() - (self.data.gap * PAGE_SIZE),
+        );
+
+        VirtPage::range_length(start, self.data.gap)
+    }
 }
 
 pub struct VTree {
@@ -116,6 +126,45 @@ impl VTree {
                 self.range = range;
             }
         };
+    }
+
+    fn search_mut_rec<F: Fn(&VTreeData) -> bool + Clone>(
+        node: &mut VTreeNode,
+        stop: F,
+    ) -> Option<&mut VTreeNode> {
+        if stop(&node.data) {
+            Some(node)
+        } else {
+            Self::search_mut_rec(node.left.as_mut()?, stop.clone())
+                .or(Self::search_mut_rec(node.right.as_mut()?, stop.clone()))
+        }
+    }
+
+    fn search_mut<F: Fn(&VTreeData) -> bool + Clone>(&mut self, stop: F) -> Option<&mut VTreeNode> {
+        match &mut self.head {
+            Some(h) => Self::search_mut_rec(h, stop),
+            None => None,
+        }
+    }
+
+    pub fn alloc_range(&mut self, requested: u64, ty: VTreeAreaType) {
+        let target = match self.search_mut(|d: &VTreeData| d.max_gap > requested) {
+            Some(t) => t,
+            None => return,
+        };
+
+        let new_range = VirtPage::range_length(target.gap_range().first(), requested);
+
+        let new_area = VTreeArea {
+            range: new_range,
+            ty,
+        };
+
+        // And we've eaten `requested` pages from this gap.
+        target.data.gap -= requested;
+
+        // Since we've carved this new range from the left edge of the existing gap the new gap is 0.
+        self.insert(&new_area, 0);
     }
 
     pub fn new(areas: &[VTreeArea]) -> Self {
@@ -249,7 +298,7 @@ mod test {
         // Generate some ranges
         let mut start = VirtPage::from_base_u64(KMEM_START + (PAGE_SIZE * 2));
         let mut init_areas = Vec::new();
-        for i in 0..5 {
+        for _ in 0..5 {
             let range = VirtPage::range_length(start, 2);
             let area = VTreeArea {
                 range,
@@ -259,7 +308,7 @@ mod test {
             start = range.end();
         }
 
-        let mut tree = VTree::new(&init_areas);
+        let tree = VTree::new(&init_areas);
 
         let v: Vec<VTreeData> = to_vec(&tree);
 
@@ -268,5 +317,27 @@ mod test {
 
         verify_gaps(&tree);
         verify_heights(&tree);
+    }
+
+    #[test]
+    fn alloc_from_gap() {
+        let start = VirtPage::from_base_u64(KMEM_START + (PAGE_SIZE * 4));
+        let range = VirtPage::range_length(start, 2);
+
+        let area = VTreeArea {
+            range,
+            ty: KernelCode,
+        };
+
+        let mut tree = VTree::new(&[area]);
+        tree.alloc_range(1, VTreeAreaType::KernelCode);
+
+        let areas = to_vec(&tree);
+        dbg!(&areas);
+
+        verify_gaps(&tree);
+        verify_heights(&tree);
+
+        assert_eq!(areas[0].area.range.len(), 1);
     }
 }
