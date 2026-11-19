@@ -2,7 +2,8 @@
     "rust-analyzer.linkedProjects": [
         "bootloader/Cargo.toml",
         "kernel/Cargo.toml",
-        "common/Cargo.toml"
+        "common/Cargo.toml",
+        "ksupport/Cargo.toml"
     ],
     "rust-analyzer.showUnlinkedFileNotification": false,
     "editor.formatOnSave": true
